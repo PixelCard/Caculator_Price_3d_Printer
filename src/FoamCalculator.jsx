@@ -182,6 +182,8 @@ export default function FoamCalculator() {
 
   return (
     <div className="workspace foam-workspace">
+      <BoxList />
+
       <section className="card inputs" aria-labelledby="foam-inputs-title">
         <h2 id="foam-inputs-title">Thông số nhập</h2>
         <p className="foam-note">Bạn có thể sửa các mức điền sẵn. Nhập 0 cho các khoản không sử dụng.</p>
@@ -234,7 +236,6 @@ export default function FoamCalculator() {
         </div>
       </section>
 
-      <BoxList />
     </div>
   );
 }
