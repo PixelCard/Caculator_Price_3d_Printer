@@ -8,69 +8,6 @@ const number = (key, label, unit) => ({ key, label, unit });
 const whole = (key, label, unit) => ({ key, label, unit, parse: parseWholeNumber });
 const percent = (key, label) => ({ key, label, unit: '%', parse: parsePercentage });
 
-const defaultInputs = {
-  toolMinutes: '350',
-  toolHourly: '20.000',
-  fineLength: '16',
-  finePerMetre: '500',
-  fineComplexity: '1,60',
-  fineMaterial: '1,50',
-  bladeLength: '0',
-  bladePerMetre: '1.000',
-  bladeComplexity: '1,60',
-  bladeMaterial: '1,50',
-  laserMinutes: '60',
-  laserReplacement: '14.000.000',
-  laserRecoveryHours: '400',
-  foilMinutes: '0',
-  foilHourly: '0',
-  laminatorMinutes: '30',
-  laminatorHourly: '5.000',
-  foamSheets: '1',
-  foamPerSheet: '55.000',
-  foamWaste: '10',
-  paperSheets: '1,5',
-  paperPerSheet: '11.200',
-  paperWaste: '10',
-  matteLength: '2',
-  mattePerMetre: '1.100',
-  matteWaste: '10',
-  glueLength: '100',
-  glueWidth: '30',
-  glueFaces: '2',
-  glueGramsPerSquareMetre: '100',
-  gluePerGram: '60',
-  toolWatts: '200',
-  laminatorWatts: '500',
-  electricityPerKwh: '5.000',
-  labourMinutes: '360',
-  labourHourly: '20.000',
-  packaging: '20.000',
-  foilSupplies: '0',
-  extraCosts: '30.000',
-  overhead: '0',
-  marginPercent: '40',
-  feePercent: '5',
-};
-
-const defaultBoxes = [
-  ['30', '2', '14'],
-  ['22', '1', '8'],
-  ['15', '1', '10'],
-  ['22', '1', '18'],
-  ['20', '1', '7'],
-  ['20', '1', '6'],
-].map(([width, quantity, parts], index) => ({
-  id: index + 1,
-  name: `No ${index + 1}`,
-  foamLength: '30',
-  foamWidth: width,
-  paperLength: '30',
-  paperWidth: width,
-  quantity,
-  parts,
-}));
-
 const inputGroups = [
   ['Máy và dụng cụ', [
     ['Máy xTool', [
@@ -216,9 +153,9 @@ function BoxList({ boxes, setBoxes, nextId, children }) {
 }
 
 export default function FoamCalculator() {
-  const [inputs, setInputs] = useState(defaultInputs);
-  const [boxes, setBoxes] = useState(defaultBoxes);
-  const nextBoxId = useRef(defaultBoxes.length + 1);
+  const [inputs, setInputs] = useState({});
+  const [boxes, setBoxes] = useState([]);
+  const nextBoxId = useRef(1);
   const [isShopee, setIsShopee] = useState(false);
   const values = Object.fromEntries(fields.map(({ key, parse = parseAmount }) => [key, parse(inputs[key] ?? '')]));
   const issues = foamInputIssues(values, isShopee);
@@ -245,7 +182,7 @@ export default function FoamCalculator() {
 
       <section className="card inputs" aria-labelledby="foam-inputs-title">
         <h2 id="foam-inputs-title">Thông số nhập</h2>
-        <p className="foam-note">Đã điền sẵn số liệu mẫu This War of Mine. Bạn có thể sửa từng ô theo bộ sản phẩm đang tính.</p>
+        <p className="foam-note">Nhập 0 cho các khoản không sử dụng.</p>
         <div className="marketplace">
           <label className="marketplace-toggle">
             <input type="checkbox" checked={isShopee} onChange={(event) => setIsShopee(event.target.checked)} />
