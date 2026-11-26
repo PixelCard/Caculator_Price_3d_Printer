@@ -7,6 +7,24 @@ const number = (key, label, unit) => ({ key, label, unit });
 const whole = (key, label, unit) => ({ key, label, unit, parse: parseWholeNumber });
 const percent = (key, label) => ({ key, label, unit: '%', parse: parsePercentage });
 
+const defaultInputs = {
+  toolHourly: '20.000',
+  finePerMetre: '500',
+  bladePerMetre: '1.000',
+  laserReplacement: '14.000.000',
+  laserRecoveryHours: '400',
+  laminatorHourly: '5.000',
+  foamPerSheet: '55.000',
+  paperPerSheet: '11.200',
+  mattePerMetre: '1.100',
+  glueGramsPerSquareMetre: '100',
+  gluePerGram: '60',
+  toolWatts: '200',
+  laminatorWatts: '500',
+  electricityPerKwh: '5.000',
+  labourHourly: '20.000',
+};
+
 const inputGroups = [
   ['Máy và dụng cụ', [
     ['Máy xTool', [
@@ -153,7 +171,7 @@ function BoxList() {
 }
 
 export default function FoamCalculator() {
-  const [inputs, setInputs] = useState({});
+  const [inputs, setInputs] = useState(defaultInputs);
   const values = Object.fromEntries(fields.map(({ key, parse = parseAmount }) => [key, parse(inputs[key] ?? '')]));
   const issues = foamInputIssues(values);
   const invalidGroup = inputGroups.find(([, sections]) => sections.some(([, groupFields]) =>
@@ -166,7 +184,7 @@ export default function FoamCalculator() {
     <div className="workspace foam-workspace">
       <section className="card inputs" aria-labelledby="foam-inputs-title">
         <h2 id="foam-inputs-title">Thông số nhập</h2>
-        <p className="foam-note">Nhập 0 cho các khoản không sử dụng.</p>
+        <p className="foam-note">Bạn có thể sửa các mức điền sẵn. Nhập 0 cho các khoản không sử dụng.</p>
         <div className="foam-input-groups">
           {inputGroups.map(([title, sections]) => (
             <details key={title} open={title === 'Máy và dụng cụ'}>
