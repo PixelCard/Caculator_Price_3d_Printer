@@ -83,10 +83,51 @@ export function CostGroup({ id, title, rows, subtotal, collapsible = false, init
   );
 }
 
-export function ShopeeCostGroup({ id, fees }) {
+export function ShopeeCostGroup({ id, fees, collapsible }) {
   const rows = shopeeFees.map(({ label, basisPoints, fixed }, index) => [
     label, fees?.[index], fixed ? `${money(fixed)}/đơn` : `${format(basisPoints / 100)}% giá bán`,
   ]);
-  return <CostGroup id={id} title="Phí Shopee" rows={rows}
+  return <CostGroup id={id} title="Phí Shopee" rows={rows} collapsible={collapsible}
     subtotal={fees?.reduce((total, amount) => total + amount, 0)} />;
+}
+
+export function PageHeading({ title, children }) {
+  return <div className="page-heading">
+    <h1>{title}</h1>
+    <div className="page-actions">{children}</div>
+  </div>;
+}
+
+export function PriceSummary({ id, title, price, children }) {
+  return <section className="sale" aria-labelledby={id}>
+    <h2 id={id}>{title}</h2>
+    <p className="sale-amount" aria-live="polite">{money(price)}</p>
+    <div className="sale-details">{children}</div>
+  </section>;
+}
+
+export function TabBar({ id, label, tabs, selected, onChange, className = '' }) {
+  function handleKey(event, index) {
+    const { key } = event;
+    const last = tabs.length - 1;
+    const targets = { ArrowLeft: index === 0 ? last : index - 1,
+      ArrowRight: index === last ? 0 : index + 1, Home: 0, End: last };
+    if (!Object.hasOwn(targets, key)) return;
+    event.preventDefault();
+    const next = targets[key];
+    onChange(tabs[next].key);
+    event.currentTarget.parentElement.children[next].focus();
+  }
+
+  return <div className={`tab-bar ${className}`} role="tablist" aria-label={label}>
+    {tabs.map((tab, index) => (
+      <button type="button" key={tab.key} role="tab" id={`${id}-tab-${tab.key}`}
+        aria-selected={selected === tab.key} aria-controls={`${id}-panel-${tab.key}`}
+        tabIndex={selected === tab.key ? 0 : -1}
+        onClick={() => onChange(tab.key)} onKeyDown={(event) => handleKey(event, index)}>
+        {tab.label}
+        {tab.status && <span className="tab-status" data-status={tab.status === 'Lỗi' ? 'error' : 'missing'}>{tab.status}</span>}
+      </button>
+    ))}
+  </div>;
 }

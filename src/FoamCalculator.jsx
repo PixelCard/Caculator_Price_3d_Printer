@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { CostGroup, NumberField, ShopeeCostGroup, format, money } from './calculator-ui.jsx';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { CostGroup, NumberField, PageHeading, PriceSummary, ShopeeCostGroup, TabBar, format, money } from './calculator-ui.jsx';
 import { calculateFoamPrice, foamInputIssues } from './foam-pricing.js';
 import { estimateSheets } from './sheet-packing.js';
 import { parseAmount, parsePercentage, parseWholeNumber } from './pricing.js';
@@ -107,7 +107,19 @@ const costGroups = [
   ['other', 'Chi phí phụ', ['Đóng gói', 'Vật tư foil', 'Phát sinh', 'Chi phí chung']],
 ];
 
-function BoxList({ boxes, setBoxes, nextId, children }) {
+const mobileTabs = [
+  { key: 'box', label: 'Box' },
+  { key: 'costs', label: 'Chi phí' },
+  { key: 'results', label: 'Kết quả' },
+];
+const settingsTabs = [
+  { key: 'materials', label: 'Vật liệu', groups: ['EVA Foam và giấy', 'Màng cán Matte', 'Keo dán'] },
+  { key: 'equipment', label: 'Thiết bị', groups: ['Máy và dụng cụ'] },
+  { key: 'operations', label: 'Vận hành', groups: ['Điện', 'Nhân công', 'Chi phí phụ'] },
+  { key: 'selling', label: 'Bán hàng', groups: ['Định giá bán'] },
+];
+
+function BoxList({ boxes, setBoxes, nextId }) {
   const updateBox = (id, key, value) => {
     setBoxes((current) => current.map((box) => box.id === id ? { ...box, [key]: value } : box));
   };
@@ -118,50 +130,53 @@ function BoxList({ boxes, setBoxes, nextId, children }) {
 
   return (
     <section className="card foam-boxes" aria-labelledby="box-title">
-      <div className="foam-box-heading">
+      <div className="card-heading">
         <h2 id="box-title">Danh sách Box</h2>
         <button type="button" className="foam-button" onClick={addBox}>Thêm Box</button>
       </div>
-      {children}
-      <p className="foam-note">Nhập kích thước foam và giấy của từng Box. Kích thước tấm foam gốc và tờ giấy gốc nằm trong nhóm EVA Foam và giấy.</p>
-      <div className="foam-box-list">
-        {boxes.map((box) => (
-          <details key={box.id} className="foam-box" aria-labelledby={`box-title-${box.id}`} open={box.initiallyOpen ?? false}>
-            <summary className="box-summary">
-              <span className="box-summary-main">
-                <strong id={`box-title-${box.id}`}>{box.name?.trim() || `Box ${box.id}`}</strong>
-                <span className="box-dimensions">
-                  {box.foamLength && box.foamWidth && <span>Foam {box.foamLength} × {box.foamWidth}</span>}
-                  {box.paperLength && box.paperWidth && <span>Giấy {box.paperLength} × {box.paperWidth}</span>}
-                </span>
-              </span>
-              {box.quantity && <span className="box-quantity">{box.quantity} Box</span>}
-            </summary>
-            <div className="box-editor">
-              <div className="box-actions">
-                <button type="button" className="foam-remove" aria-label={`Xóa Box ${box.id}`}
-                  onClick={() => setBoxes((current) => current.filter((item) => item.id !== box.id))}>Xóa</button>
-              </div>
-              <div className="box-fields">
-                <div className="field box-name">
-                  <label htmlFor={`box-name-${box.id}`}>Tên Box</label>
-                  <div className="input-box">
-                    <input id={`box-name-${box.id}`} value={box.name ?? ''}
-                      onChange={(event) => updateBox(box.id, 'name', event.target.value)} />
+      {boxes.length ? <div className="box-table-scroll" role="region" aria-label="Thông số từng Box" tabIndex={0}>
+        <table className="box-table" aria-labelledby="box-title">
+          <thead>
+            <tr>
+              <th scope="col" rowSpan={2}>Tên Box</th>
+              <th scope="colgroup" colSpan={2}>Foam (cm)</th>
+              <th scope="colgroup" colSpan={2}>Giấy (cm)</th>
+              <th scope="col" rowSpan={2}>Số Box</th>
+              <th scope="col" rowSpan={2}>Chi tiết / Box</th>
+              <th scope="col" rowSpan={2}><span className="sr-only">Thao tác</span></th>
+            </tr>
+            <tr><th scope="col">Dài</th><th scope="col">Rộng</th><th scope="col">Dài</th><th scope="col">Rộng</th></tr>
+          </thead>
+          <tbody>
+            {boxes.map((box) => (
+              <tr key={box.id} className="foam-box" aria-label={box.name?.trim() || `Box ${box.id}`}>
+                <td className="box-name">
+                  <div className="field">
+                    <label htmlFor={`box-name-${box.id}`}>Tên Box</label>
+                    <div className="input-box">
+                      <input id={`box-name-${box.id}`} value={box.name ?? ''} placeholder={`Box ${box.id}`}
+                        onChange={(event) => updateBox(box.id, 'name', event.target.value)} />
+                    </div>
                   </div>
-                </div>
+                </td>
                 {boxFields.map((field) => {
                   const input = box[field.key] ?? '';
                   const value = (field.parse ?? parseAmount)(input);
-                  return <NumberField key={field.key} id={`box-${box.id}-${field.key}`} field={field}
-                    input={input} value={field.positive && value === 0 ? null : value} required={false}
-                    onChange={(amount) => updateBox(box.id, field.key, amount)} />;
+                  return <td key={field.key}>
+                    <NumberField id={`box-${box.id}-${field.key}`} field={field}
+                      input={input} value={field.positive && value === 0 ? null : value} required={false}
+                      onChange={(amount) => updateBox(box.id, field.key, amount)} />
+                  </td>;
                 })}
-              </div>
-            </div>
-          </details>
-        ))}
-      </div>
+                <td className="box-actions">
+                  <button type="button" className="foam-remove" aria-label={`Xóa Box ${box.id}`}
+                    onClick={() => setBoxes((current) => current.filter((item) => item.id !== box.id))}>Xóa</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div> : <p className="empty-note">Thêm Box hoặc nhập Excel để có danh sách kích thước.</p>}
     </section>
   );
 }
@@ -210,11 +225,29 @@ function MaterialSheetCount({ id, label, unit, estimate }) {
   </>;
 }
 
-export default function FoamCalculator() {
+export default function FoamCalculator({ title }) {
   const [inputs, setInputs] = useState({});
   const [boxes, setBoxes] = useState([]);
   const nextBoxId = useRef(1);
   const [isShopee, setIsShopee] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('materials');
+  const [mobileTab, setMobileTab] = useState('box');
+  const mobileTabsRef = useRef(null);
+  const resultsRef = useRef(null);
+  useEffect(() => {
+    const panel = resultsRef.current;
+    const fitResults = () => {
+      panel.dataset.sticky = String(panel.offsetHeight + 32 <= window.innerHeight);
+    };
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fitResults);
+    observer?.observe(panel);
+    window.addEventListener('resize', fitResults);
+    fitResults();
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', fitResults);
+    };
+  }, []);
   const values = Object.fromEntries(fields.map(({ key, parse = parseAmount, positive }) => {
     const value = parse(inputs[key] ?? '');
     return [key, positive && value === 0 ? null : value];
@@ -231,7 +264,8 @@ export default function FoamCalculator() {
     groupFields.some((field) => isActiveField(field) && (values[field.key] === null || issues[field.key]))));
   const incompleteEstimate = [foamEstimate, paperEstimate].find(({ sheets }) => sheets === null);
   const result = invalidGroup || incompleteEstimate ? null : calculateFoamPrice(calculationInputs, isShopee);
-  const priceWithoutShopee = isShopee && result ? calculateFoamPrice(calculationInputs)?.salePrice : result?.salePrice;
+  const directResult = isShopee && result ? calculateFoamPrice(calculationInputs) : result;
+  const priceWithoutShopee = directResult?.salePrice;
   const resultMessage = invalidGroup
     ? `Kiểm tra các ô trong nhóm ${invalidGroup[0]}.`
     : incompleteEstimate?.message ?? 'Số tiền vượt giới hạn tính toán.';
@@ -245,59 +279,88 @@ export default function FoamCalculator() {
     }
   }
 
-  return (
-    <div className="workspace foam-workspace">
-      <BoxList boxes={boxes} setBoxes={setBoxes} nextId={nextBoxId}>
+  const tabs = settingsTabs.map((tab) => {
+    const tabFields = inputGroups.filter(([title]) => tab.groups.includes(title))
+      .flatMap(([, sections]) => sections.flatMap(([, groupFields]) => groupFields)).filter(isActiveField);
+    const material = tab.key === 'materials';
+    const hasError = tabFields.some(({ key }) => issues[key] || (values[key] === null && inputs[key]?.trim()))
+      || (material && (foamEstimate.error || paperEstimate.error));
+    const missing = tabFields.some(({ key }) => values[key] === null) || (material && incompleteEstimate);
+    return { ...tab, status: hasError ? 'Lỗi' : missing ? 'Thiếu' : null };
+  });
+
+  function showMobileResults() {
+    setMobileTab('results');
+    mobileTabsRef.current?.scrollIntoView({ block: 'start' });
+    mobileTabsRef.current?.querySelector('#foam-mobile-tab-results')?.focus({ preventScroll: true });
+  }
+
+  return <>
+    <PageHeading title={title}>
         <ExcelImport mode="foam" fields={fields} onImport={applyImport} />
-      </BoxList>
-
-      <section className="card inputs" aria-labelledby="foam-inputs-title">
-        <h2 id="foam-inputs-title">Thông số nhập</h2>
-        <p className="foam-note">Nhập 0 cho các khoản không sử dụng.</p>
-        <div className="marketplace">
-          <label className="marketplace-toggle">
-            <input type="checkbox" checked={isShopee} onChange={(event) => setIsShopee(event.target.checked)} />
-            Bán qua Shopee
-          </label>
-          {isShopee && <p>Phí theo phần trăm tính trên giá bán. Phí hạ tầng tính cho một đơn có một bộ sản phẩm.</p>}
+    </PageHeading>
+    <div ref={mobileTabsRef} className="mobile-tab-shell">
+      <TabBar id="foam-mobile" label="Khu vực tính giá Foam & Giấy" tabs={mobileTabs}
+        selected={mobileTab} onChange={setMobileTab} />
+    </div>
+    <div className="workspace foam-workspace" data-mobile-panel={mobileTab}>
+      <div className="input-workspace">
+        <div className="foam-box-panel" role="tabpanel" id="foam-mobile-panel-box" aria-labelledby="foam-mobile-tab-box">
+          <BoxList boxes={boxes} setBoxes={setBoxes} nextId={nextBoxId} />
         </div>
-        <div className="foam-input-groups">
-          {inputGroups.map(([title, sections]) => (
-            <details key={title} open={title === 'EVA Foam và giấy'}>
-              <summary>{title}</summary>
-              {sections.map(([subtitle, groupFields]) => (
-                <div className={title === 'EVA Foam và giấy' ? 'foam-fields material-fields' : 'foam-fields'} key={subtitle ?? title}>
-                  {subtitle && <h3>{subtitle}</h3>}
-                  {subtitle === 'Máy xTool' && <p className="foam-note">Tổng phút xTool bao gồm thời gian chạy laser và foil.</p>}
-                  {groupFields.filter(isActiveField).map((field) => (
-                    <NumberField key={field.key} id={`foam-${field.key}`} field={field}
-                      input={inputs[field.key] ?? ''} value={values[field.key]} error={issues[field.key]}
-                      onChange={(value) => setInputs((current) => ({ ...current, [field.key]: value }))} />
+        <section className="card inputs foam-cost-panel" role="tabpanel" id="foam-mobile-panel-costs" aria-labelledby="foam-mobile-tab-costs">
+          <h2 id="foam-inputs-title">Thông số chi phí</h2>
+          <TabBar id="foam-settings" label="Nhóm thông số chi phí" tabs={tabs}
+            selected={settingsTab} onChange={setSettingsTab} className="settings-tabs" />
+          <p className="foam-note">Nhập 0 cho các khoản không sử dụng.</p>
+          {tabs.map(({ key, groups }) => (
+            <div className="settings-panel" key={key} id={`foam-settings-panel-${key}`}
+              role="tabpanel" aria-labelledby={`foam-settings-tab-${key}`} hidden={settingsTab !== key}>
+              {key === 'selling' && <div className="marketplace">
+                <label className="marketplace-toggle">
+                  <input type="checkbox" checked={isShopee} onChange={(event) => setIsShopee(event.target.checked)} />
+                  Bán qua Shopee
+                </label>
+                {isShopee && <p>Phí theo phần trăm tính trên giá bán. Phí hạ tầng tính cho một đơn có một bộ sản phẩm.</p>}
+              </div>}
+              {inputGroups.filter(([title]) => groups.includes(title)).map(([title, sections]) => (
+                <section className="form-section" key={title}>
+                  <h3>{title}</h3>
+                  {sections.map(([subtitle, groupFields]) => (
+                    <div className={title === 'EVA Foam và giấy' ? 'foam-fields material-fields' : 'foam-fields'} key={subtitle ?? title}>
+                      {subtitle && <h4>{subtitle}</h4>}
+                      {subtitle === 'Máy xTool' && <p className="foam-note">Tổng phút xTool bao gồm thời gian chạy laser và foil.</p>}
+                      <div className="form-grid">
+                        {groupFields.filter(isActiveField).map((field) => (
+                          <NumberField key={field.key} id={`foam-${field.key}`} field={field}
+                            input={inputs[field.key] ?? ''} value={values[field.key]} error={issues[field.key]}
+                            onChange={(value) => setInputs((current) => ({ ...current, [field.key]: value }))} />
+                        ))}
+                      </div>
+                      {subtitle === 'EVA Foam' && <MaterialSheetCount id="foam-foamSheets" label="Số tấm foam" unit="tấm" estimate={foamEstimate} />}
+                      {subtitle === 'Giấy' && <MaterialSheetCount id="foam-paperSheets" label="Số tờ giấy (2 mặt)" unit="tờ" estimate={paperEstimate} />}
+                      {subtitle === 'Laser 20W' && <p className="foam-note">Dự phòng thay module mỗi giờ <strong>{money(laserHourly)}</strong></p>}
+                    </div>
                   ))}
-                  {subtitle === 'EVA Foam' && <MaterialSheetCount id="foam-foamSheets" label="Số tấm foam" unit="tấm" estimate={foamEstimate} />}
-                  {subtitle === 'Giấy' && <MaterialSheetCount id="foam-paperSheets" label="Số tờ giấy (2 mặt)" unit="tờ" estimate={paperEstimate} />}
-                  {subtitle === 'Laser 20W' && <p className="foam-note">Dự phòng thay module mỗi giờ <strong>{money(laserHourly)}</strong></p>}
-                </div>
+                </section>
               ))}
-            </details>
+            </div>
           ))}
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <div className="results-stack">
-        <section className="sale" aria-labelledby="foam-sale-title">
-          <h2 id="foam-sale-title">Giá bán cho một bộ</h2>
-          <p className="sale-amount" aria-live="polite">{money(result?.salePrice)}</p>
-          <div className="sale-details">
+      <div className="results-stack foam-result-panel" ref={resultsRef} role="tabpanel"
+        id="foam-mobile-panel-results" aria-labelledby="foam-mobile-tab-results">
+        <PriceSummary id="foam-sale-title" title={isShopee ? 'Giá bán qua Shopee' : 'Giá bán đề xuất cho một bộ'} price={result?.salePrice}>
             {result ? <>
+              <p className="sale-metric">Tổng giá vốn <strong>{money(result.totalCost)}</strong></p>
               <p className="sale-metric">{isShopee ? 'Phí Shopee' : 'Phí bán hàng'} <strong>{money(result.salesFee)}</strong></p>
               <p className="sale-metric">Lãi sau phí <strong>{money(result.profit)}</strong></p>
               <p className="sale-metric">Tỉ lệ lãi thực tế <strong>{result.actualMargin === null ? '—' : `${format(result.actualMargin)}%`}</strong></p>
             </> : <p>{resultMessage}</p>}
             <p className="sale-metric sale-comparison">Giá bán không qua Shopee <strong>{money(priceWithoutShopee)}</strong></p>
             {isShopee && result && priceWithoutShopee == null && <p>Bỏ tick Shopee để kiểm tra tỉ lệ phí bán hàng.</p>}
-          </div>
-        </section>
+        </PriceSummary>
 
         <section className="card breakdown" aria-labelledby="foam-breakdown-title">
           <h2 id="foam-breakdown-title">Chi tiết chi phí</h2>
@@ -306,21 +369,41 @@ export default function FoamCalculator() {
             return <CostGroup key={key} id={`foam-cost-${key}`} title={title}
               rows={labels.map((label, index) => [label, amounts?.[index]])}
               subtotal={amounts?.reduce((total, amount) => total + amount, 0)}
-              collapsible initiallyOpen={key === 'material'} />;
+              collapsible />;
           })}
           <div className="cost-heading cost-total">
             <h3>Tổng giá vốn</h3>
             <strong>{money(result?.totalCost)}</strong>
           </div>
-          {isShopee && <>
-            <ShopeeCostGroup id="foam-marketplace-costs" fees={result?.fees} />
+        </section>
+        {isShopee && <section className="card breakdown shopee-breakdown" aria-label="Chi phí bán qua Shopee">
+            <ShopeeCostGroup id="foam-marketplace-costs" fees={result?.fees} collapsible />
             <div className="cost-heading cost-total">
               <h3>Tổng chi phí gồm phí Shopee</h3>
               <strong>{money(result ? result.totalCost + result.salesFee : null)}</strong>
             </div>
-          </>}
-        </section>
+        </section>}
+        {isShopee && result && directResult && <section className="card" aria-labelledby="channel-comparison-title">
+          <h2 id="channel-comparison-title">So sánh kênh bán</h2>
+          <table className="channel-table">
+            <thead><tr><th scope="col">Chỉ số</th><th scope="col">Ngoài Shopee</th><th scope="col">Qua Shopee</th></tr></thead>
+            <tbody>
+              {[
+                ['Giá vốn', 'totalCost'],
+                ['Phí bán hàng', 'salesFee'],
+                ['Giá bán', 'salePrice'],
+                ['Lãi sau phí', 'profit'],
+              ].map(([label, key]) => (
+                <tr key={key}><th scope="row">{label}</th><td>{money(directResult[key])}</td><td>{money(result[key])}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </section>}
       </div>
     </div>
-  );
+    {mobileTab !== 'results' && <div className="mobile-result-bar">
+      <div><span>Giá bán đề xuất</span><strong aria-live="polite">{money(result?.salePrice)}</strong></div>
+      <button type="button" className="foam-button" onClick={showMobileResults}>Chi tiết</button>
+    </div>}
+  </>;
 }

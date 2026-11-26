@@ -4,7 +4,7 @@ import {
   calculatePrice, exceedsShopeeMultiplierLimit, parseAmount, parsePercentage, parseWholeNumber,
 } from './pricing.js';
 import brandLogo from '../Images/game-piece-labs-logo-horizontal.webp';
-import { CostGroup, NumberField, ShopeeCostGroup, format, money } from './calculator-ui.jsx';
+import { CostGroup, NumberField, PageHeading, PriceSummary, ShopeeCostGroup, format, money } from './calculator-ui.jsx';
 import FoamCalculator from './FoamCalculator.jsx';
 import ExcelImport from './ExcelImport.jsx';
 import './styles.css';
@@ -21,7 +21,14 @@ const fields = [
   { key: 'packaging', label: 'Bao bì, đóng gói', unit: 'đ', parse: parseWholeNumber },
   { key: 'saleMultiplier', label: 'Hệ số nhân giá bán', unit: 'lần', positive: true },
 ];
-function PrintCalculator() {
+
+const printSections = [
+  ['Thông số sản phẩm', ['grams', 'filamentPrice', 'hours']],
+  ['Thông số máy in', ['powerWatts', 'printerPrice', 'printerLifetimeHours', 'wastePercent']],
+  ['Chi phí và giá bán', ['electricityPerKwh', 'packaging', 'saleMultiplier']],
+];
+
+function PrintCalculator({ title }) {
   const [inputs, setInputs] = useState({});
   const [isShopee, setIsShopee] = useState(false);
   const values = Object.fromEntries(fields.map(({ key, parse = parseAmount, positive }) => {
@@ -42,41 +49,41 @@ function PrintCalculator() {
   ];
   const printSubtotal = result ? printCosts.reduce((total, [, amount]) => total + amount, 0) : null;
 
-  return (
+  return <>
+      <PageHeading title={title}>
+        <ExcelImport mode="print" fields={fields}
+          onImport={({ inputs: imported }) => setInputs((current) => ({ ...current, ...imported }))} />
+      </PageHeading>
       <div className="workspace">
         <section className="card inputs" aria-labelledby="inputs-title">
           <h2 id="inputs-title">Thông số nhập</h2>
-          <ExcelImport mode="print" fields={fields}
-            onImport={({ inputs: imported }) => setInputs((current) => ({ ...current, ...imported }))} />
-          <div className="field-list">
-            {fields.map((field) => (
-              <NumberField
-                key={field.key}
-                id={field.key}
-                field={field}
-                input={inputs[field.key] ?? ''}
-                value={values[field.key]}
-                error={field.key === 'saleMultiplier' && multiplierTooHigh ? multiplierError : undefined}
-                onChange={(value) => setInputs((current) => ({ ...current, [field.key]: value }))}
-              />
-            ))}
-          </div>
-          <div className="marketplace">
-            <label className="marketplace-toggle">
-              <input type="checkbox" checked={isShopee} onChange={(event) => setIsShopee(event.target.checked)} />
-              Bán qua Shopee
-            </label>
-            {isShopee && <p>Phí theo phần trăm tính trên giá bán đã làm tròn. Phí hạ tầng tính cho một đơn có một sản phẩm.</p>}
-          </div>
+          {printSections.map(([title, keys]) => (
+            <section className="form-section" key={title}>
+              <h3>{title}</h3>
+              <div className="form-grid">
+                {fields.filter((field) => keys.includes(field.key)).map((field) => (
+                  <NumberField key={field.key} id={field.key} field={field}
+                    input={inputs[field.key] ?? ''} value={values[field.key]}
+                    error={field.key === 'saleMultiplier' && multiplierTooHigh ? multiplierError : undefined}
+                    onChange={(value) => setInputs((current) => ({ ...current, [field.key]: value }))} />
+                ))}
+              </div>
+              {keys.includes('saleMultiplier') && <div className="marketplace">
+                <label className="marketplace-toggle">
+                  <input type="checkbox" checked={isShopee} onChange={(event) => setIsShopee(event.target.checked)} />
+                  Bán qua Shopee
+                </label>
+                {isShopee && <p>Phí theo phần trăm tính trên giá bán đã làm tròn. Phí hạ tầng tính cho một đơn có một sản phẩm.</p>}
+              </div>}
+            </section>
+          ))}
         </section>
 
         <div className="results-stack">
-          <section className="sale" aria-labelledby="sale-title">
-            <h2 id="sale-title">Giá bán gợi ý</h2>
-            <p className="sale-amount" aria-live="polite">{money(result?.salePrice)}</p>
-            <div className="sale-details">
+          <PriceSummary id="sale-title" title={isShopee ? 'Giá bán qua Shopee' : 'Giá bán gợi ý'} price={result?.salePrice}>
               {result ? (
                 <>
+                  <p className="sale-metric">Tổng chi phí <strong>{money(result.totalCost)}</strong></p>
                   <p className="sale-metric">Trước làm tròn <strong>{money(result.unroundedSalePrice)}</strong></p>
                   <p className="sale-metric">Lãi mỗi sản phẩm <strong>{money(result.profit)}</strong></p>
                   <p>{isShopee
@@ -88,8 +95,7 @@ function PrintCalculator() {
                   : valid ? 'Số tiền vượt giới hạn tính toán.' : 'Điền đủ 10 ô để tính giá bán.'}</p>
                 <p>Lãi mỗi sản phẩm <strong>—</strong></p>
               </>}
-            </div>
-          </section>
+          </PriceSummary>
 
           <section className="card breakdown" aria-labelledby="breakdown-title">
             <h2 id="breakdown-title">Chi tiết chi phí</h2>
@@ -98,20 +104,22 @@ function PrintCalculator() {
               <h3>Bao bì, đóng gói</h3>
               <strong>{money(result?.packaging)}</strong>
             </div>
-            {isShopee && <ShopeeCostGroup id="marketplace-costs" fees={result?.fees} />}
             <div className="cost-heading cost-total">
               <h3>Tổng chi phí</h3>
               <strong>{money(result?.totalCost)}</strong>
             </div>
           </section>
+          {isShopee && <section className="card breakdown shopee-breakdown" aria-label="Chi phí bán qua Shopee">
+            <ShopeeCostGroup id="marketplace-costs" fees={result?.fees} collapsible />
+          </section>}
         </div>
       </div>
-  );
+  </>;
 }
 
 const pages = {
-  '#in-3d': { label: 'Tính giá in 3D', title: 'Bảng tính giá bán đồ in 3D', unit: 'một sản phẩm' },
-  '#foam-giay': { label: 'Tính giá Foam & Giấy', title: 'Bảng tính giá bán Foam & Giấy', unit: 'một bộ sản phẩm' },
+  '#in-3d': { label: 'Tính giá in 3D', title: 'Bảng tính giá bán đồ in 3D' },
+  '#foam-giay': { label: 'Tính giá Foam & Giấy', title: 'Bảng tính giá bán Foam & Giấy' },
 };
 const currentPage = () => window.location.hash === '#foam-giay' ? '#foam-giay' : '#in-3d';
 
@@ -122,27 +130,23 @@ function App() {
     window.addEventListener('hashchange', updatePage);
     return () => window.removeEventListener('hashchange', updatePage);
   }, []);
-  const { title, unit } = pages[page];
+  const { title } = pages[page];
   useEffect(() => {
     document.title = `${title} – Game Piece Labs`;
   }, [title]);
 
   return (
     <main className="shell">
-      <header className="intro">
-        <div className="brand-bar">
+      <header className="brand-bar">
           <img className="brand-logo" src={brandLogo} alt="Game Piece Labs" width="256" height="98" />
           <nav className="calculator-nav" aria-label="Chọn bảng tính">
             {Object.entries(pages).map(([route, { label }]) => (
               <a key={route} href={route} aria-current={route === page ? 'page' : undefined}>{label}</a>
             ))}
           </nav>
-        </div>
-        <h1>{title}</h1>
-        <p>Điền các ô màu vàng để tự động tính chi phí và giá bán cho {unit}.</p>
       </header>
-      <div hidden={page !== '#in-3d'}><PrintCalculator /></div>
-      <div hidden={page !== '#foam-giay'}><FoamCalculator /></div>
+      <div hidden={page !== '#in-3d'}><PrintCalculator title={pages['#in-3d'].title} /></div>
+      <div hidden={page !== '#foam-giay'}><FoamCalculator title={pages['#foam-giay'].title} /></div>
     </main>
   );
 }
