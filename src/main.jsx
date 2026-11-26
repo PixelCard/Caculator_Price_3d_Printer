@@ -70,41 +70,41 @@ function PrintCalculator() {
           </div>
         </section>
 
-        <section className="card breakdown" aria-labelledby="breakdown-title">
-          <h2 id="breakdown-title">Chi tiết chi phí</h2>
-          <CostGroup id="print-costs" title="Chi phí in" rows={printCosts} subtotal={printSubtotal} />
-          <div className="cost-heading packaging-cost">
-            <h3>Bao bì, đóng gói</h3>
-            <strong>{money(result?.packaging)}</strong>
-          </div>
-          {isShopee && <ShopeeCostGroup id="marketplace-costs" fees={result?.fees} />}
-          <div className="cost-heading cost-total">
-            <h3>Tổng chi phí</h3>
-            <strong>{money(result?.totalCost)}</strong>
-          </div>
-        </section>
-
-        <section className="sale" aria-labelledby="sale-title">
-          <div>
+        <div className="results-stack">
+          <section className="sale" aria-labelledby="sale-title">
             <h2 id="sale-title">Giá bán gợi ý</h2>
             <p className="sale-amount" aria-live="polite">{money(result?.salePrice)}</p>
-          </div>
-          <div className="sale-details">
-            {result ? (
-              <>
-                <p>Trước làm tròn <strong>{money(result.unroundedSalePrice)}</strong></p>
-                <p>{isShopee
-                  ? `Giữ hệ số × ${format(values.saleMultiplier)} trên tổng chi phí đã gồm phí Shopee.`
-                  : `Tổng chi phí × ${format(values.saleMultiplier)}, làm tròn lên bội số 1.000 ₫.`}</p>
-                <p>Lãi mỗi sản phẩm <strong>{money(result.profit)}</strong></p>
-              </>
-            ) : <>
-              <p>{multiplierTooHigh ? 'Giảm hệ số nhân để tính được giá Shopee.'
-                : valid ? 'Số tiền vượt giới hạn tính toán.' : 'Điền đủ 10 ô để tính giá bán.'}</p>
-              <p>Lãi mỗi sản phẩm <strong>—</strong></p>
-            </>}
-          </div>
-        </section>
+            <div className="sale-details">
+              {result ? (
+                <>
+                  <p className="sale-metric">Trước làm tròn <strong>{money(result.unroundedSalePrice)}</strong></p>
+                  <p className="sale-metric">Lãi mỗi sản phẩm <strong>{money(result.profit)}</strong></p>
+                  <p>{isShopee
+                    ? `Giữ hệ số × ${format(values.saleMultiplier)} trên tổng chi phí đã gồm phí Shopee.`
+                    : `Tổng chi phí × ${format(values.saleMultiplier)}, làm tròn lên bội số 1.000 ₫.`}</p>
+                </>
+              ) : <>
+                <p>{multiplierTooHigh ? 'Giảm hệ số nhân để tính được giá Shopee.'
+                  : valid ? 'Số tiền vượt giới hạn tính toán.' : 'Điền đủ 10 ô để tính giá bán.'}</p>
+                <p>Lãi mỗi sản phẩm <strong>—</strong></p>
+              </>}
+            </div>
+          </section>
+
+          <section className="card breakdown" aria-labelledby="breakdown-title">
+            <h2 id="breakdown-title">Chi tiết chi phí</h2>
+            <CostGroup id="print-costs" title="Chi phí in" rows={printCosts} subtotal={printSubtotal} />
+            <div className="cost-heading packaging-cost">
+              <h3>Bao bì, đóng gói</h3>
+              <strong>{money(result?.packaging)}</strong>
+            </div>
+            {isShopee && <ShopeeCostGroup id="marketplace-costs" fees={result?.fees} />}
+            <div className="cost-heading cost-total">
+              <h3>Tổng chi phí</h3>
+              <strong>{money(result?.totalCost)}</strong>
+            </div>
+          </section>
+        </div>
       </div>
   );
 }

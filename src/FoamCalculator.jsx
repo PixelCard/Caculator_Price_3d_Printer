@@ -113,7 +113,7 @@ function BoxList({ boxes, setBoxes, nextId, children }) {
   };
   const addBox = () => {
     const id = nextId.current++;
-    setBoxes((current) => [...current, { id }]);
+    setBoxes((current) => [...current, { id, initiallyOpen: true }]);
   };
 
   return (
@@ -126,29 +126,40 @@ function BoxList({ boxes, setBoxes, nextId, children }) {
       <p className="foam-note">Nhập kích thước foam và giấy của từng Box. Kích thước tấm foam gốc và tờ giấy gốc nằm trong nhóm EVA Foam và giấy.</p>
       <div className="foam-box-list">
         {boxes.map((box) => (
-          <section key={box.id} className="foam-box" aria-labelledby={`box-title-${box.id}`}>
-            <div className="foam-box-heading">
-              <h3 id={`box-title-${box.id}`}>Box {box.id}</h3>
-              <button type="button" className="foam-remove" aria-label={`Xóa Box ${box.id}`}
-                onClick={() => setBoxes((current) => current.filter((item) => item.id !== box.id))}>Xóa</button>
-            </div>
-            <div className="foam-fields">
-              <div className="field">
-                <label htmlFor={`box-name-${box.id}`}>Tên Box</label>
-                <div className="input-box">
-                  <input id={`box-name-${box.id}`} value={box.name ?? ''}
-                    onChange={(event) => updateBox(box.id, 'name', event.target.value)} />
-                </div>
+          <details key={box.id} className="foam-box" aria-labelledby={`box-title-${box.id}`} open={box.initiallyOpen ?? false}>
+            <summary className="box-summary">
+              <span className="box-summary-main">
+                <strong id={`box-title-${box.id}`}>{box.name?.trim() || `Box ${box.id}`}</strong>
+                <span className="box-dimensions">
+                  {box.foamLength && box.foamWidth && <span>Foam {box.foamLength} × {box.foamWidth}</span>}
+                  {box.paperLength && box.paperWidth && <span>Giấy {box.paperLength} × {box.paperWidth}</span>}
+                </span>
+              </span>
+              {box.quantity && <span className="box-quantity">{box.quantity} Box</span>}
+            </summary>
+            <div className="box-editor">
+              <div className="box-actions">
+                <button type="button" className="foam-remove" aria-label={`Xóa Box ${box.id}`}
+                  onClick={() => setBoxes((current) => current.filter((item) => item.id !== box.id))}>Xóa</button>
               </div>
-              {boxFields.map((field) => {
-                const input = box[field.key] ?? '';
-                const value = (field.parse ?? parseAmount)(input);
-                return <NumberField key={field.key} id={`box-${box.id}-${field.key}`} field={field}
-                  input={input} value={field.positive && value === 0 ? null : value} required={false}
-                  onChange={(amount) => updateBox(box.id, field.key, amount)} />;
-              })}
+              <div className="box-fields">
+                <div className="field box-name">
+                  <label htmlFor={`box-name-${box.id}`}>Tên Box</label>
+                  <div className="input-box">
+                    <input id={`box-name-${box.id}`} value={box.name ?? ''}
+                      onChange={(event) => updateBox(box.id, 'name', event.target.value)} />
+                  </div>
+                </div>
+                {boxFields.map((field) => {
+                  const input = box[field.key] ?? '';
+                  const value = (field.parse ?? parseAmount)(input);
+                  return <NumberField key={field.key} id={`box-${box.id}-${field.key}`} field={field}
+                    input={input} value={field.positive && value === 0 ? null : value} required={false}
+                    onChange={(amount) => updateBox(box.id, field.key, amount)} />;
+                })}
+              </div>
             </div>
-          </section>
+          </details>
         ))}
       </div>
     </section>
@@ -189,7 +200,7 @@ function estimateMaterial(boxes, length, width, material) {
 
 function MaterialSheetCount({ id, label, unit, estimate }) {
   return <>
-    <div className="cost-heading packaging-cost">
+    <div className="cost-heading material-count">
       <h3 id={`${id}-label`}>{label}</h3>
       <output id={id} aria-labelledby={`${id}-label`}>
         {estimate.sheets === null ? '—' : `${format(estimate.sheets)} ${unit}`}
@@ -252,10 +263,10 @@ export default function FoamCalculator() {
         </div>
         <div className="foam-input-groups">
           {inputGroups.map(([title, sections]) => (
-            <details key={title} open={title === 'Máy và dụng cụ' || title === 'EVA Foam và giấy'}>
+            <details key={title} open={title === 'EVA Foam và giấy'}>
               <summary>{title}</summary>
               {sections.map(([subtitle, groupFields]) => (
-                <div className="foam-fields" key={subtitle ?? title}>
+                <div className={title === 'EVA Foam và giấy' ? 'foam-fields material-fields' : 'foam-fields'} key={subtitle ?? title}>
                   {subtitle && <h3>{subtitle}</h3>}
                   {subtitle === 'Máy xTool' && <p className="foam-note">Tổng phút xTool bao gồm thời gian chạy laser và foil.</p>}
                   {groupFields.filter(isActiveField).map((field) => (
@@ -273,43 +284,43 @@ export default function FoamCalculator() {
         </div>
       </section>
 
-      <section className="card breakdown" aria-labelledby="foam-breakdown-title">
-        <h2 id="foam-breakdown-title">Chi tiết chi phí</h2>
-        {costGroups.map(([key, title, labels]) => {
-          const amounts = result?.costs[key];
-          return <CostGroup key={key} id={`foam-cost-${key}`} title={title}
-            rows={labels.map((label, index) => [label, amounts?.[index]])}
-            subtotal={amounts?.reduce((total, amount) => total + amount, 0)} />;
-        })}
-        <div className="cost-heading cost-total">
-          <h3>Tổng giá vốn</h3>
-          <strong>{money(result?.totalCost)}</strong>
-        </div>
-        {isShopee && <>
-          <ShopeeCostGroup id="foam-marketplace-costs" fees={result?.fees} />
-          <div className="cost-heading cost-total">
-            <h3>Tổng chi phí gồm phí Shopee</h3>
-            <strong>{money(result ? result.totalCost + result.salesFee : null)}</strong>
-          </div>
-        </>}
-      </section>
-
-      <section className="sale" aria-labelledby="foam-sale-title">
-        <div>
+      <div className="results-stack">
+        <section className="sale" aria-labelledby="foam-sale-title">
           <h2 id="foam-sale-title">Giá bán cho một bộ</h2>
           <p className="sale-amount" aria-live="polite">{money(result?.salePrice)}</p>
-        </div>
-        <div className="sale-details">
-          {result ? <>
-            <p>{isShopee ? 'Phí Shopee' : 'Phí bán hàng'} <strong>{money(result.salesFee)}</strong></p>
-            <p>Lãi sau phí <strong>{money(result.profit)}</strong></p>
-            <p>Tỉ lệ lãi thực tế <strong>{result.actualMargin === null ? '—' : `${format(result.actualMargin)}%`}</strong></p>
-          </> : <p>{resultMessage}</p>}
-          <p className="sale-comparison">Giá bán không qua Shopee <strong>{money(priceWithoutShopee)}</strong></p>
-          {isShopee && result && priceWithoutShopee == null && <p>Bỏ tick Shopee để kiểm tra tỉ lệ phí bán hàng.</p>}
-        </div>
-      </section>
+          <div className="sale-details">
+            {result ? <>
+              <p className="sale-metric">{isShopee ? 'Phí Shopee' : 'Phí bán hàng'} <strong>{money(result.salesFee)}</strong></p>
+              <p className="sale-metric">Lãi sau phí <strong>{money(result.profit)}</strong></p>
+              <p className="sale-metric">Tỉ lệ lãi thực tế <strong>{result.actualMargin === null ? '—' : `${format(result.actualMargin)}%`}</strong></p>
+            </> : <p>{resultMessage}</p>}
+            <p className="sale-metric sale-comparison">Giá bán không qua Shopee <strong>{money(priceWithoutShopee)}</strong></p>
+            {isShopee && result && priceWithoutShopee == null && <p>Bỏ tick Shopee để kiểm tra tỉ lệ phí bán hàng.</p>}
+          </div>
+        </section>
 
+        <section className="card breakdown" aria-labelledby="foam-breakdown-title">
+          <h2 id="foam-breakdown-title">Chi tiết chi phí</h2>
+          {costGroups.map(([key, title, labels]) => {
+            const amounts = result?.costs[key];
+            return <CostGroup key={key} id={`foam-cost-${key}`} title={title}
+              rows={labels.map((label, index) => [label, amounts?.[index]])}
+              subtotal={amounts?.reduce((total, amount) => total + amount, 0)}
+              collapsible initiallyOpen={key === 'material'} />;
+          })}
+          <div className="cost-heading cost-total">
+            <h3>Tổng giá vốn</h3>
+            <strong>{money(result?.totalCost)}</strong>
+          </div>
+          {isShopee && <>
+            <ShopeeCostGroup id="foam-marketplace-costs" fees={result?.fees} />
+            <div className="cost-heading cost-total">
+              <h3>Tổng chi phí gồm phí Shopee</h3>
+              <strong>{money(result ? result.totalCost + result.salesFee : null)}</strong>
+            </div>
+          </>}
+        </section>
+      </div>
     </div>
   );
 }

@@ -60,13 +60,15 @@ export function NumberField({ id, field, input, value, onChange, error, required
   );
 }
 
-export function CostGroup({ id, title, rows, subtotal }) {
+export function CostGroup({ id, title, rows, subtotal, collapsible = false, initiallyOpen = false }) {
+  const Group = collapsible ? 'details' : 'section';
+  const Heading = collapsible ? 'summary' : 'div';
   return (
-    <section className="cost-group" aria-labelledby={id}>
-      <div className="cost-heading">
+    <Group className="cost-group" aria-labelledby={id} open={collapsible ? initiallyOpen : undefined}>
+      <Heading className="cost-heading">
         <h3 id={id}>{title}</h3>
         <strong>{money(subtotal)}</strong>
-      </div>
+      </Heading>
       <table aria-labelledby={id}>
         <tbody>
           {rows.map(([label, amount, explanation]) => (
@@ -77,7 +79,7 @@ export function CostGroup({ id, title, rows, subtotal }) {
           ))}
         </tbody>
       </table>
-    </section>
+    </Group>
   );
 }
 
