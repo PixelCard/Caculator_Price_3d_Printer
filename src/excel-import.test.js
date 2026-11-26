@@ -28,6 +28,9 @@ test('imports Foam variable codes, inline laser inputs, margin and the Box table
   sheet.addRow(['Box', 'Sheet Foam (cm)', 'Sheet Paper (cm)', 'Số Box giống nhau', 'Part', 'Ghi chú']);
   sheet.addRow(['No 1', '30 x 30', '30 × 30', 2, 14, 'Box No 1 - 30 x 30 x9c']);
   sheet.addRow(['Bảng biến đầu vào']);
+  sheet.addRow(['L_EVA', 120]);
+  sheet.addRow(['W_EVA', '100 cm']);
+  sheet.addRow(['N_EVA', 99]);
   sheet.addRow(['N_giay', 1.5]);
   sheet.addRow(['R_giay', '0,10']);
   sheet.addRow(['* G_laser = 14.000.000 VNĐ (giá thay module Laser 20W).']);
@@ -35,6 +38,8 @@ test('imports Foam variable codes, inline laser inputs, margin and the Box table
   sheet.addRow(['KẾT QUẢ TÍNH GIÁ VỐN']);
   sheet.addRow(['Margin mục tiêu: 40% — Fee: 5%']);
   const result = importWorkbook(workbook, [
+    { key: 'foamStockLength', label: 'Chiều dài tấm foam gốc', unit: 'cm', positive: true },
+    { key: 'foamStockWidth', label: 'Chiều rộng tấm foam gốc', unit: 'cm', positive: true },
     { key: 'paperSheets', label: 'Số tờ giấy' },
     { key: 'paperWaste', label: 'Hao hụt giấy', parse: parsePercentage },
     { key: 'laserReplacement', label: 'Giá thay module laser', unit: 'đ', parse: parseWholeNumber },
@@ -44,6 +49,7 @@ test('imports Foam variable codes, inline laser inputs, margin and the Box table
   ], 'foam');
 
   assert.deepEqual(result.inputs, {
+    foamStockLength: '120', foamStockWidth: '100',
     paperSheets: '1,5', paperWaste: '10', laserReplacement: '14.000.000',
     laserRecoveryHours: '400', marginPercent: '40', feePercent: '5',
   });

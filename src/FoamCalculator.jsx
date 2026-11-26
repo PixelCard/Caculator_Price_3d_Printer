@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { CostGroup, NumberField, ShopeeCostGroup, format, money } from './calculator-ui.jsx';
 import { calculateFoamPrice, foamInputIssues } from './foam-pricing.js';
+import { estimateFoamSheets } from './foam-sheets.js';
 import { parseAmount, parsePercentage, parseWholeNumber } from './pricing.js';
 import ExcelImport from './ExcelImport.jsx';
 
@@ -42,7 +43,8 @@ const inputGroups = [
   ]],
   ['EVA Foam và giấy', [
     ['EVA Foam', [
-      number('foamSheets', 'Số tấm foam', 'tấm'),
+      { ...number('foamStockLength', 'Chiều dài tấm foam gốc', 'cm'), positive: true },
+      { ...number('foamStockWidth', 'Chiều rộng tấm foam gốc', 'cm'), positive: true },
       whole('foamPerSheet', 'Giá foam', 'đ/tấm'),
       percent('foamWaste', 'Hao hụt foam'),
     ]],
@@ -87,8 +89,8 @@ const inputGroups = [
 
 const fields = inputGroups.flatMap(([, sections]) => sections.flatMap(([, sectionFields]) => sectionFields));
 const boxFields = [
-  number('foamLength', 'Chiều dài foam', 'cm'),
-  number('foamWidth', 'Chiều rộng foam', 'cm'),
+  { ...number('foamLength', 'Chiều dài foam', 'cm'), positive: true },
+  { ...number('foamWidth', 'Chiều rộng foam', 'cm'), positive: true },
   number('paperLength', 'Chiều dài giấy', 'cm'),
   number('paperWidth', 'Chiều rộng giấy', 'cm'),
   { ...whole('quantity', 'Số Box giống nhau', 'Box'), positive: true },
@@ -120,7 +122,7 @@ function BoxList({ boxes, setBoxes, nextId, children }) {
         <button type="button" className="foam-button" onClick={addBox}>Thêm Box</button>
       </div>
       {children}
-      <p className="foam-note">Nhập số tấm foam và số tờ giấy dùng cho cả bộ trong nhóm EVA Foam và giấy.</p>
+      <p className="foam-note">Số tấm foam được tính từ kích thước foam và số lượng của mỗi Box. Nhập kích thước tấm foam gốc và số tờ giấy trong nhóm EVA Foam và giấy.</p>
       <div className="foam-box-list">
         {boxes.map((box) => (
           <section key={box.id} className="foam-box" aria-labelledby={`box-title-${box.id}`}>
@@ -157,13 +159,35 @@ export default function FoamCalculator() {
   const [boxes, setBoxes] = useState([]);
   const nextBoxId = useRef(1);
   const [isShopee, setIsShopee] = useState(false);
-  const values = Object.fromEntries(fields.map(({ key, parse = parseAmount }) => [key, parse(inputs[key] ?? '')]));
+  const values = Object.fromEntries(fields.map(({ key, parse = parseAmount, positive }) => {
+    const value = parse(inputs[key] ?? '');
+    return [key, positive && value === 0 ? null : value];
+  }));
+  const { foamStockLength, foamStockWidth } = values;
+  const foamEstimate = useMemo(() => estimateFoamSheets(foamStockLength, foamStockWidth, boxes.map((box) => ({
+    name: box.name?.trim() || `Box ${box.id}`,
+    length: parseAmount(box.foamLength ?? ''),
+    width: parseAmount(box.foamWidth ?? ''),
+    quantity: parseWholeNumber(box.quantity ?? ''),
+  }))), [foamStockLength, foamStockWidth, boxes]);
+  const foamMessages = {
+    incomplete: `Kiểm tra kích thước foam và số lượng của ${foamEstimate.box}.`,
+    oversize: `Miếng foam của ${foamEstimate.box} lớn hơn tấm foam gốc.`,
+    'too-many': 'Số tấm foam vượt giới hạn tính toán.',
+  };
+  const foamMessage = foamMessages[foamEstimate.issue] ?? (foamStockLength === null || foamStockWidth === null
+    ? 'Nhập chiều dài và chiều rộng tấm foam gốc.'
+    : 'Thêm Box để tính số tấm foam.');
+  const calculationInputs = { ...values, foamSheets: foamEstimate.sheets };
   const issues = foamInputIssues(values, isShopee);
   const isActiveField = ({ key }) => key !== 'feePercent' || !isShopee;
   const invalidGroup = inputGroups.find(([, sections]) => sections.some(([, groupFields]) =>
     groupFields.some((field) => isActiveField(field) && (values[field.key] === null || issues[field.key]))));
-  const result = invalidGroup ? null : calculateFoamPrice(values, isShopee);
-  const priceWithoutShopee = isShopee && result ? calculateFoamPrice(values)?.salePrice : result?.salePrice;
+  const result = invalidGroup || foamEstimate.sheets === null ? null : calculateFoamPrice(calculationInputs, isShopee);
+  const priceWithoutShopee = isShopee && result ? calculateFoamPrice(calculationInputs)?.salePrice : result?.salePrice;
+  const resultMessage = invalidGroup
+    ? `Kiểm tra các ô trong nhóm ${invalidGroup[0]}.`
+    : foamEstimate.sheets === null ? foamMessage : 'Số tiền vượt giới hạn tính toán.';
   const laserHourly = values.laserReplacement !== null && values.laserRecoveryHours > 0
     ? values.laserReplacement / values.laserRecoveryHours : null;
   function applyImport({ inputs: imported, boxes: importedBoxes }) {
@@ -192,7 +216,7 @@ export default function FoamCalculator() {
         </div>
         <div className="foam-input-groups">
           {inputGroups.map(([title, sections]) => (
-            <details key={title} open={title === 'Máy và dụng cụ'}>
+            <details key={title} open={title === 'Máy và dụng cụ' || title === 'EVA Foam và giấy'}>
               <summary>{title}</summary>
               {sections.map(([subtitle, groupFields]) => (
                 <div className="foam-fields" key={subtitle ?? title}>
@@ -203,6 +227,17 @@ export default function FoamCalculator() {
                       input={inputs[field.key] ?? ''} value={values[field.key]} error={issues[field.key]}
                       onChange={(value) => setInputs((current) => ({ ...current, [field.key]: value }))} />
                   ))}
+                  {subtitle === 'EVA Foam' && <>
+                    <div className="cost-heading packaging-cost">
+                      <h3 id="foam-sheets-label">Số tấm foam</h3>
+                      <output id="foam-foamSheets" aria-labelledby="foam-sheets-label">
+                        {foamEstimate.sheets === null ? '—' : `${format(foamEstimate.sheets)} tấm`}
+                      </output>
+                    </div>
+                    <p className={foamEstimate.issue ? 'error' : 'foam-note'}>
+                      {foamEstimate.sheets === null ? foamMessage : 'Ước tính theo cách xếp miếng chữ nhật, cho phép xoay 90°.'}
+                    </p>
+                  </>}
                   {subtitle === 'Laser 20W' && <p className="foam-note">Dự phòng thay module mỗi giờ <strong>{money(laserHourly)}</strong></p>}
                 </div>
               ))}
@@ -242,7 +277,7 @@ export default function FoamCalculator() {
             <p>{isShopee ? 'Phí Shopee' : 'Phí bán hàng'} <strong>{money(result.salesFee)}</strong></p>
             <p>Lãi sau phí <strong>{money(result.profit)}</strong></p>
             <p>Tỉ lệ lãi thực tế <strong>{result.actualMargin === null ? '—' : `${format(result.actualMargin)}%`}</strong></p>
-          </> : <p>{invalidGroup ? `Kiểm tra các ô trong nhóm ${invalidGroup[0]}.` : 'Số tiền vượt giới hạn tính toán.'}</p>}
+          </> : <p>{resultMessage}</p>}
           <p className="sale-comparison">Giá bán không qua Shopee <strong>{money(priceWithoutShopee)}</strong></p>
           {isShopee && result && priceWithoutShopee == null && <p>Bỏ tick Shopee để kiểm tra tỉ lệ phí bán hàng.</p>}
         </div>
