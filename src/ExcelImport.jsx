@@ -39,6 +39,8 @@ export default function ExcelImport({ fields, mode, onImport }) {
       if (count && count < fields.length) notes.push(`Kiểm tra ${fields.length - count} ô chưa được nhập từ file.`);
       if (result.invalidCount) notes.push(`Có ${result.invalidCount} thông số sai định dạng.`);
       if (result.invalidBoxes) notes.push('Kiểm tra kích thước và số chi tiết trong bảng Box.');
+      if (result.boxQuantityIssue === 'missing-column') notes.push('Bảng Box thiếu cột Số Box giống nhau.');
+      if (result.boxQuantityIssue === 'invalid-value') notes.push('Nhập số nguyên từ 1 trở lên ở cột Số Box giống nhau.');
       setMessage([summary, ...notes].join(' '));
       setFailed(!parts.length || Boolean(notes.length));
     } catch {

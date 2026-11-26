@@ -25,8 +25,8 @@ test('imports Excel percentages and skips the print results section', async () =
 test('imports Foam variable codes, inline laser inputs, margin and the Box table', () => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Foam');
-  sheet.addRow(['Box', 'Sheet Foam (cm)', 'Sheet Paper (cm)', 'Part', 'Ghi chú']);
-  sheet.addRow(['No 1', '30 x 30', '30 × 30', 14, 'Box No 1 - 30 x 30 x2c']);
+  sheet.addRow(['Box', 'Sheet Foam (cm)', 'Sheet Paper (cm)', 'Số Box giống nhau', 'Part', 'Ghi chú']);
+  sheet.addRow(['No 1', '30 x 30', '30 × 30', 2, 14, 'Box No 1 - 30 x 30 x9c']);
   sheet.addRow(['Bảng biến đầu vào']);
   sheet.addRow(['N_giay', 1.5]);
   sheet.addRow(['R_giay', '0,10']);
@@ -51,4 +51,22 @@ test('imports Foam variable codes, inline laser inputs, margin and the Box table
     name: 'No 1', foamLength: '30', foamWidth: '30', paperLength: '30',
     paperWidth: '30', quantity: '2', parts: '14',
   }]);
+});
+
+test('requires the Box quantity column and rejects invalid quantities', () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Box');
+  sheet.addRow(['Box', 'Sheet Foam (cm)', 'Sheet Paper (cm)', 'Part', 'Ghi chú']);
+  sheet.addRow(['No 1', '30 x 30', '30 x 30', 14, 'x2c']);
+  const missing = importWorkbook(workbook, [], 'foam');
+  assert.equal(missing.boxQuantityIssue, 'missing-column');
+  assert.deepEqual(missing.boxes, []);
+
+  sheet.getCell('F1').value = 'Số Box giống nhau';
+  for (const value of [null, 0, -1, 1.5, 'ABC']) {
+    sheet.getCell('F2').value = value;
+    const invalid = importWorkbook(workbook, [], 'foam');
+    assert.equal(invalid.boxQuantityIssue, 'invalid-value');
+    assert.deepEqual(invalid.boxes, []);
+  }
 });

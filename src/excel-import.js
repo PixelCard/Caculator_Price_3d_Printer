@@ -115,6 +115,7 @@ function readSheet(sheet, fields, mode, aliases) {
   let boxColumns = null;
   let sawBoxHeader = false;
   let invalidBoxes = false;
+  let boxQuantityIssue = null;
   let legacyPrint = false;
   let knife = null;
   sheet.eachRow((row) => {
@@ -138,23 +139,30 @@ function readSheet(sheet, fields, mode, aliases) {
         headers.findIndex((text) => ['part', 'so chi tiet', 'so chi tiet moi box'].includes(text)),
       ];
       if (headerColumns.every((index) => index >= 0)) {
-        boxColumns = headerColumns.map((index) => cells[index].column);
         sawBoxHeader = true;
+        const quantityIndex = headers.findIndex((text) => text === 'so box giong nhau');
+        if (quantityIndex === -1) {
+          boxQuantityIssue = 'missing-column';
+          boxColumns = null;
+        } else {
+          boxColumns = [...headerColumns, quantityIndex].map((index) => cells[index].column);
+        }
         return;
       }
       if (boxColumns) {
-        const [name, foam, paper, parts] = boxColumns.map((column) => cells.find((cell) => cell.column === column));
-        if (name?.text && (foam || paper || parts)) {
+        const [name, foam, paper, parts, quantityCell] = boxColumns.map((column) => cells.find((cell) => cell.column === column));
+        if (name?.text && (foam || paper || parts || quantityCell)) {
           const foamSize = dimension(foam?.text ?? '');
           const paperSize = dimension(paper?.text ?? '');
           const count = parseWholeNumber(parts?.text ?? '');
-          const copies = cells.filter(({ column }) => column > boxColumns[3]).map(({ text }) => text).join(' ')
-            .match(/(?:x|×)\s*(\d+)\s*(?:c\b|cái\b|copies\b)/iu);
-          if (!foamSize || !paperSize || count === null || (copies && Number(copies[1]) < 1)) {
-            invalidBoxes = true;
-          } else {
+          const quantity = typeof quantityCell?.value === 'number'
+            ? quantityCell.value : parseWholeNumber(quantityCell?.text ?? '');
+          const validQuantity = Number.isSafeInteger(quantity) && quantity > 0;
+          if (!validQuantity) boxQuantityIssue ??= 'invalid-value';
+          if (!foamSize || !paperSize || count === null) invalidBoxes = true;
+          else if (validQuantity) {
             boxes.push({ name: name.text, foamLength: foamSize[0], foamWidth: foamSize[1],
-              paperLength: paperSize[0], paperWidth: paperSize[1], quantity: copies?.[1] ?? '1', parts: String(count) });
+              paperLength: paperSize[0], paperWidth: paperSize[1], quantity: String(quantity), parts: String(count) });
           }
           return;
         }
@@ -202,7 +210,7 @@ function readSheet(sheet, fields, mode, aliases) {
       && fields.every(({ key }) => key === 'packaging' || Object.hasOwn(inputs, key))) {
     inputs.packaging ??= '0';
   }
-  return { inputs, boxes, sawBoxHeader, invalidBoxes, invalidCount: invalid.size, sheet: sheet.name };
+  return { inputs, boxes, sawBoxHeader, invalidBoxes, boxQuantityIssue, invalidCount: invalid.size, sheet: sheet.name };
 }
 
 export function importWorkbook(workbook, fields, mode) {
@@ -211,7 +219,9 @@ export function importWorkbook(workbook, fields, mode) {
   const best = reports.sort((a, b) => Object.keys(b.inputs).length - Object.keys(a.inputs).length)[0];
   if (!best) return null;
   const boxReport = best.sawBoxHeader ? best : reports.find((report) => report.sawBoxHeader);
-  const boxes = boxReport?.invalidBoxes ? [] : boxReport?.boxes ?? [];
-  if (!Object.keys(best.inputs).length && !boxes.length && !best.invalidCount && !boxReport?.invalidBoxes) return null;
-  return { inputs: best.inputs, boxes, sheet: best.sheet, invalidCount: best.invalidCount, invalidBoxes: boxReport?.invalidBoxes };
+  const invalidBoxes = boxReport?.invalidBoxes;
+  const boxQuantityIssue = boxReport?.boxQuantityIssue;
+  const boxes = invalidBoxes || boxQuantityIssue ? [] : boxReport?.boxes ?? [];
+  if (!Object.keys(best.inputs).length && !boxes.length && !best.invalidCount && !invalidBoxes && !boxQuantityIssue) return null;
+  return { inputs: best.inputs, boxes, sheet: best.sheet, invalidCount: best.invalidCount, invalidBoxes, boxQuantityIssue };
 }
