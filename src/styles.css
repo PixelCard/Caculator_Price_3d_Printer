@@ -72,9 +72,8 @@ h2 { font-size: 1.25rem; line-height: 1.3; letter-spacing: -0.018em; }
 }
 .cost-heading h3 { font-size: 0.97rem; }
 .cost-heading strong { text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-#marketplace-costs { color: #8b3819; }
-.cost-group[aria-labelledby="marketplace-costs"] { border-color: #f1dfd5; }
-.cost-group[aria-labelledby="marketplace-costs"] .cost-heading { background: #fcf0e9; color: #8b3819; }
+.cost-group[aria-labelledby$="marketplace-costs"] { border-color: #f1dfd5; }
+.cost-group[aria-labelledby$="marketplace-costs"] .cost-heading { background: #fcf0e9; color: #8b3819; }
 .packaging-cost { margin-top: 12px; border-radius: 10px; background: #f5f6f9; color: #354057; }
 .cost-total { margin-top: 16px; border-radius: 10px; background: #e8e1fc; }
 .cost-group table { width: 100%; border-collapse: collapse; }

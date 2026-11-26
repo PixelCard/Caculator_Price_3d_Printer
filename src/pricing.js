@@ -35,7 +35,7 @@ export function calculatePrice({
     : baseCost * saleMultiplier;
   // Remove floating-point noise around an exact rounding boundary.
   const salePrice = Math.ceil(Number((unroundedSalePrice / 1000).toPrecision(15))) * 1000;
-  const fees = isShopee ? shopeeFees.map(({ basisPoints, fixed }) => fixed ?? (salePrice * basisPoints) / 10000) : [];
+  const fees = isShopee ? calculateShopeeFees(salePrice) : [];
   const totalCost = baseCost + fees.reduce((total, amount) => total + amount, 0);
 
   if (totalCost > Number.MAX_SAFE_INTEGER || !Number.isSafeInteger(salePrice)) return null;
@@ -49,8 +49,12 @@ export const shopeeFees = [
   { label: 'Thuế GTGT', basisPoints: 100 },
   { label: 'Thuế TNCN', basisPoints: 50 },
 ];
-const shopeeRate = shopeeFees.reduce((total, fee) => total + (fee.basisPoints ?? 0), 0) / 10000;
-const shopeeFixed = shopeeFees.reduce((total, fee) => total + (fee.fixed ?? 0), 0);
+export const shopeeRate = shopeeFees.reduce((total, fee) => total + (fee.basisPoints ?? 0), 0) / 10000;
+export const shopeeFixed = shopeeFees.reduce((total, fee) => total + (fee.fixed ?? 0), 0);
+
+export function calculateShopeeFees(salePrice) {
+  return shopeeFees.map(({ basisPoints, fixed }) => fixed ?? (salePrice * basisPoints) / 10000);
+}
 
 export function exceedsShopeeMultiplierLimit(multiplier) {
   return multiplier >= 1 / shopeeRate;

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  calculatePrice, exceedsShopeeMultiplierLimit, parseAmount, parsePercentage, parseWholeNumber, shopeeFees,
+  calculatePrice, exceedsShopeeMultiplierLimit, parseAmount, parsePercentage, parseWholeNumber,
 } from './pricing.js';
 import brandLogo from '../Images/game-piece-labs-logo-horizontal.webp';
-import { CostGroup, NumberField, format, money } from './calculator-ui.jsx';
+import { CostGroup, NumberField, ShopeeCostGroup, format, money } from './calculator-ui.jsx';
 import FoamCalculator from './FoamCalculator.jsx';
 import './styles.css';
 
@@ -39,11 +39,7 @@ function PrintCalculator() {
     ['Hao mòn máy', result?.machine, 'Giá máy ÷ tuổi thọ × giờ in'],
     ['In hỏng', result?.waste, 'Tỉ lệ in hỏng × tổng tiền nhựa, điện và máy'],
   ];
-  const marketplaceCosts = shopeeFees.map(({ label, basisPoints, fixed }, index) => [
-    label, result?.fees[index], fixed ? `${money(fixed)}/đơn` : `${format(basisPoints / 100)}% giá bán`,
-  ]);
   const printSubtotal = result ? printCosts.reduce((total, [, amount]) => total + amount, 0) : null;
-  const marketplaceSubtotal = result?.fees.reduce((total, amount) => total + amount, 0);
 
   return (
       <div className="workspace">
@@ -78,7 +74,7 @@ function PrintCalculator() {
             <h3>Bao bì, đóng gói</h3>
             <strong>{money(result?.packaging)}</strong>
           </div>
-          {isShopee && <CostGroup id="marketplace-costs" title="Phí Shopee" rows={marketplaceCosts} subtotal={marketplaceSubtotal} />}
+          {isShopee && <ShopeeCostGroup id="marketplace-costs" fees={result?.fees} />}
           <div className="cost-heading cost-total">
             <h3>Tổng chi phí</h3>
             <strong>{money(result?.totalCost)}</strong>

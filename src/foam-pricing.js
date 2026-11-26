@@ -1,4 +1,6 @@
-export function foamInputIssues(values) {
+import { calculateShopeeFees, shopeeFixed, shopeeRate } from './pricing.js';
+
+export function foamInputIssues(values, isShopee = false) {
   const issues = {};
   const { toolMinutes, laserMinutes, foilMinutes, laserRecoveryHours, marginPercent, feePercent } = values;
 
@@ -9,13 +11,17 @@ export function foamInputIssues(values) {
   if (laserMinutes > 0 && laserRecoveryHours === 0) {
     issues.laserRecoveryHours = 'Nhập số giờ thu hồi lớn hơn 0 khi có chạy laser.';
   }
-  if (Number.isFinite(marginPercent) && Number.isFinite(feePercent) && marginPercent + feePercent >= 100) {
+  if (isShopee && Number.isFinite(marginPercent) && marginPercent >= 100 - shopeeRate * 100) {
+    issues.marginPercent = 'Tỉ lệ lãi mục tiêu cộng tổng % phí Shopee phải nhỏ hơn 100%.';
+  } else if (!isShopee && Number.isFinite(marginPercent) && Number.isFinite(feePercent)
+      && marginPercent + feePercent >= 100) {
     issues.feePercent = 'Tổng tỉ lệ lãi mục tiêu và phí bán hàng phải nhỏ hơn 100%.';
   }
   return issues;
 }
 
-export function calculateFoamPrice(values) {
+export function calculateFoamPrice(values, isShopee = false) {
+  const { feePercent, ...requiredInputs } = values;
   const {
     toolMinutes, toolHourly, fineLength, finePerMetre, fineComplexity, fineMaterial,
     bladeLength, bladePerMetre, bladeComplexity, bladeMaterial,
@@ -24,10 +30,11 @@ export function calculateFoamPrice(values) {
     paperSheets, paperPerSheet, paperWaste, matteLength, mattePerMetre, matteWaste,
     glueLength, glueWidth, glueFaces, glueGramsPerSquareMetre, gluePerGram,
     toolWatts, laminatorWatts, electricityPerKwh, labourMinutes, labourHourly,
-    packaging, foilSupplies, extraCosts, overhead, marginPercent, feePercent,
-  } = values;
+    packaging, foilSupplies, extraCosts, overhead, marginPercent,
+  } = requiredInputs;
 
-  if (!Object.values(values).every(Number.isFinite) || Object.keys(foamInputIssues(values)).length > 0) return null;
+  if (!Object.values(requiredInputs).every(Number.isFinite) || (!isShopee && !Number.isFinite(feePercent))
+      || Object.keys(foamInputIssues(values, isShopee)).length > 0) return null;
 
   const toolHours = toolMinutes / 60;
   const laminatorHours = laminatorMinutes / 60;
@@ -56,11 +63,14 @@ export function calculateFoamPrice(values) {
     other: [packaging, foilSupplies, extraCosts, overhead],
   };
   const totalCost = Object.values(costs).flat().reduce((total, amount) => total + amount, 0);
-  const salePrice = totalCost / ((100 - marginPercent - feePercent) / 100);
+  const ratePercent = isShopee ? shopeeRate * 100 : feePercent;
+  const fixedFee = isShopee ? shopeeFixed : 0;
+  const salePrice = (totalCost + fixedFee) / ((100 - marginPercent - ratePercent) / 100);
   if (!Number.isFinite(salePrice) || salePrice > Number.MAX_SAFE_INTEGER) return null;
 
-  const salesFee = salePrice * (feePercent / 100);
+  const fees = isShopee ? calculateShopeeFees(salePrice) : [];
+  const salesFee = isShopee ? fees.reduce((total, fee) => total + fee, 0) : salePrice * (feePercent / 100);
   const profit = salePrice - totalCost - salesFee;
   const actualMargin = salePrice > 0 ? (profit / salePrice) * 100 : null;
-  return { costs, laserHourly, totalCost, salePrice, salesFee, profit, actualMargin };
+  return { costs, laserHourly, totalCost, salePrice, fees, salesFee, profit, actualMargin };
 }

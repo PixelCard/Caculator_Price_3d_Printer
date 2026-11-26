@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { CostGroup, NumberField, format, money } from './calculator-ui.jsx';
+import { CostGroup, NumberField, ShopeeCostGroup, format, money } from './calculator-ui.jsx';
 import { calculateFoamPrice, foamInputIssues } from './foam-pricing.js';
 import { parseAmount, parsePercentage, parseWholeNumber } from './pricing.js';
 
@@ -172,11 +172,13 @@ function BoxList() {
 
 export default function FoamCalculator() {
   const [inputs, setInputs] = useState(defaultInputs);
+  const [isShopee, setIsShopee] = useState(false);
   const values = Object.fromEntries(fields.map(({ key, parse = parseAmount }) => [key, parse(inputs[key] ?? '')]));
-  const issues = foamInputIssues(values);
+  const issues = foamInputIssues(values, isShopee);
+  const isActiveField = ({ key }) => key !== 'feePercent' || !isShopee;
   const invalidGroup = inputGroups.find(([, sections]) => sections.some(([, groupFields]) =>
-    groupFields.some(({ key }) => values[key] === null || issues[key])));
-  const result = invalidGroup ? null : calculateFoamPrice(values);
+    groupFields.some((field) => isActiveField(field) && (values[field.key] === null || issues[field.key]))));
+  const result = invalidGroup ? null : calculateFoamPrice(values, isShopee);
   const laserHourly = values.laserReplacement !== null && values.laserRecoveryHours > 0
     ? values.laserReplacement / values.laserRecoveryHours : null;
 
@@ -187,6 +189,13 @@ export default function FoamCalculator() {
       <section className="card inputs" aria-labelledby="foam-inputs-title">
         <h2 id="foam-inputs-title">Thông số nhập</h2>
         <p className="foam-note">Bạn có thể sửa các mức điền sẵn. Nhập 0 cho các khoản không sử dụng.</p>
+        <div className="marketplace">
+          <label className="marketplace-toggle">
+            <input type="checkbox" checked={isShopee} onChange={(event) => setIsShopee(event.target.checked)} />
+            Bán qua Shopee
+          </label>
+          {isShopee && <p>Phí theo phần trăm tính trên giá bán. Phí hạ tầng tính cho một đơn có một bộ sản phẩm.</p>}
+        </div>
         <div className="foam-input-groups">
           {inputGroups.map(([title, sections]) => (
             <details key={title} open={title === 'Máy và dụng cụ'}>
@@ -195,7 +204,7 @@ export default function FoamCalculator() {
                 <div className="foam-fields" key={subtitle ?? title}>
                   {subtitle && <h3>{subtitle}</h3>}
                   {subtitle === 'Máy xTool' && <p className="foam-note">Tổng phút xTool bao gồm thời gian chạy laser và foil.</p>}
-                  {groupFields.map((field) => (
+                  {groupFields.filter(isActiveField).map((field) => (
                     <NumberField key={field.key} id={`foam-${field.key}`} field={field}
                       input={inputs[field.key] ?? ''} value={values[field.key]} error={issues[field.key]}
                       onChange={(value) => setInputs((current) => ({ ...current, [field.key]: value }))} />
@@ -220,6 +229,13 @@ export default function FoamCalculator() {
           <h3>Tổng giá vốn</h3>
           <strong>{money(result?.totalCost)}</strong>
         </div>
+        {isShopee && <>
+          <ShopeeCostGroup id="foam-marketplace-costs" fees={result?.fees} />
+          <div className="cost-heading cost-total">
+            <h3>Tổng chi phí gồm phí Shopee</h3>
+            <strong>{money(result ? result.totalCost + result.salesFee : null)}</strong>
+          </div>
+        </>}
       </section>
 
       <section className="sale" aria-labelledby="foam-sale-title">
@@ -229,7 +245,7 @@ export default function FoamCalculator() {
         </div>
         <div className="sale-details">
           {result ? <>
-            <p>Phí bán hàng <strong>{money(result.salesFee)}</strong></p>
+            <p>{isShopee ? 'Phí Shopee' : 'Phí bán hàng'} <strong>{money(result.salesFee)}</strong></p>
             <p>Lãi sau phí <strong>{money(result.profit)}</strong></p>
             <p>Tỉ lệ lãi thực tế <strong>{result.actualMargin === null ? '—' : `${format(result.actualMargin)}%`}</strong></p>
           </> : <p>{invalidGroup ? `Kiểm tra các ô trong nhóm ${invalidGroup[0]}.` : 'Số tiền vượt giới hạn tính toán.'}</p>}

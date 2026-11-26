@@ -1,5 +1,5 @@
 import React from 'react';
-import { parsePercentage, parseWholeNumber } from './pricing.js';
+import { parsePercentage, parseWholeNumber, shopeeFees } from './pricing.js';
 
 const numberFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 export const format = (amount) => numberFormat.format(amount);
@@ -79,4 +79,12 @@ export function CostGroup({ id, title, rows, subtotal }) {
       </table>
     </section>
   );
+}
+
+export function ShopeeCostGroup({ id, fees }) {
+  const rows = shopeeFees.map(({ label, basisPoints, fixed }, index) => [
+    label, fees?.[index], fixed ? `${money(fixed)}/đơn` : `${format(basisPoints / 100)}% giá bán`,
+  ]);
+  return <CostGroup id={id} title="Phí Shopee" rows={rows}
+    subtotal={fees?.reduce((total, amount) => total + amount, 0)} />;
 }

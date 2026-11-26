@@ -38,3 +38,18 @@ test('handles unused laser, inconsistent run time and invalid pricing percentage
   assert.equal(calculateFoamPrice({ ...sample, feePercent: 60 }), null);
   assert.equal(calculateFoamPrice({ ...sample, foamSheets: null }), null);
 });
+
+test('prices a Foam & Paper order with all five Shopee fees and preserves the target margin', () => {
+  const result = calculateFoamPrice({ ...sample, feePercent: null }, true);
+  assert.equal(result.totalCost.toFixed(2), '435450.00');
+  assert.equal(result.salePrice.toFixed(2), '1201232.88');
+  assert.deepEqual(result.fees.map((fee) => fee.toFixed(2)), [
+    '72073.97', '192197.26', '3000.00', '12012.33', '6006.16',
+  ]);
+  assert.equal(result.salesFee.toFixed(2), '285289.73');
+  assert.equal(result.profit.toFixed(2), '480493.15');
+  assert.equal(result.actualMargin.toFixed(2), '40.00');
+  assert.equal(calculateFoamPrice(sample, true).salePrice, result.salePrice);
+  assert.ok(foamInputIssues({ ...sample, marginPercent: 76.5 }, true).marginPercent);
+  assert.equal(calculateFoamPrice({ ...sample, marginPercent: 76.5 }, true), null);
+});
