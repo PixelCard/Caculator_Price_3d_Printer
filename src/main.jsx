@@ -98,7 +98,7 @@ function App() {
   return (
     <main className="shell">
       <header className="intro">
-        <img className="brand-logo" src={brandLogo} alt="Game Piece Labs" width="192" height="72" />
+        <img className="brand-logo" src={brandLogo} alt="Game Piece Labs" width="256" height="98" />
         <h1>Bảng tính giá bán đồ in 3D</h1>
         <p>Điền các ô màu vàng để tự động tính chi phí và giá bán cho một sản phẩm.</p>
       </header>
