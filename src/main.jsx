@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { calculatePrice, parseAmount, parsePercentage, parseWholeNumber } from './pricing.js';
+import {
+  calculatePrice, exceedsShopeeMultiplierLimit, parseAmount, parsePercentage, parseWholeNumber, shopeeFees,
+} from './pricing.js';
 import './styles.css';
 
 const fields = [
@@ -20,14 +22,45 @@ const numberFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }
 const format = (amount) => numberFormat.format(amount);
 const money = (amount) => amount == null ? '—' : `${format(amount)} ₫`;
 
+function formatWholeNumberInput(event, previous) {
+  const input = event.target;
+  const raw = input.value;
+  const { inputType, data } = event.nativeEvent;
+  const editsDigits = inputType?.startsWith('delete') || (inputType === 'insertText' && /^\d+$/.test(data ?? ''));
+  // A keystroke can temporarily leave the separators from the previous value in place.
+  const candidate = editsDigits && parseWholeNumber(previous) !== null && /^[\d.]+$/.test(raw)
+    ? raw.replaceAll('.', '') : raw;
+  const number = parseWholeNumber(candidate);
+  if (number === null) return raw;
+
+  const formatted = format(number);
+  if (formatted !== raw) {
+    const digitsAfterCaret = raw.slice(input.selectionStart).replace(/\D/g, '').length;
+    let caret = formatted.length;
+    let remaining = digitsAfterCaret;
+    while (caret > 0 && remaining > 0) {
+      caret -= 1;
+      if (/\d/.test(formatted[caret])) remaining -= 1;
+    }
+    requestAnimationFrame(() => {
+      if (input.value === formatted && document.activeElement === input) input.setSelectionRange(caret, caret);
+    });
+  }
+  return formatted;
+}
+
 function App() {
   const [inputs, setInputs] = useState({});
+  const [isShopee, setIsShopee] = useState(false);
   const values = Object.fromEntries(fields.map(({ key, parse = parseAmount, positive }) => {
     const value = parse(inputs[key] ?? '');
     return [key, positive && value === 0 ? null : value];
   }));
   const valid = Object.values(values).every((value) => value !== null);
-  const result = valid ? calculatePrice(values) : null;
+  const multiplierTooHigh = isShopee && values.saleMultiplier !== null
+    && exceedsShopeeMultiplierLimit(values.saleMultiplier);
+  const multiplierError = 'Hệ số quá cao để tính giá Shopee. Hãy giảm hệ số (ví dụ 4,25 trở xuống).';
+  const result = valid && !multiplierTooHigh ? calculatePrice({ ...values, isShopee }) : null;
 
   const details = [
     ['Tiền nhựa', result?.filament, 'Khối lượng × giá nhựa ÷ 1.000'],
@@ -35,6 +68,9 @@ function App() {
     ['Hao mòn máy', result?.machine, 'Giá máy ÷ tuổi thọ × giờ in'],
     ['In hỏng', result?.waste, 'Tỉ lệ in hỏng × tổng tiền nhựa, điện và máy'],
     ['Bao bì', result?.packaging],
+    ...(isShopee ? shopeeFees.map(({ label, basisPoints, fixed }, index) => [
+      label, result?.fees[index], fixed ? `${money(fixed)}/đơn` : `${format(basisPoints / 100)}% giá bán`,
+    ]) : []),
     ['Tổng chi phí', result?.totalCost],
   ];
 
@@ -42,8 +78,7 @@ function App() {
     <main className="shell">
       <header className="intro">
         <div className="title-line">
-          <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
-          <span>BrosFil</span>
+          <span>game peice labs</span>
         </div>
         <h1>Bảng tính giá bán đồ in 3D</h1>
         <p>Điền các ô màu vàng để tự động tính chi phí và giá bán cho một sản phẩm.</p>
@@ -58,7 +93,8 @@ function App() {
           <div className="field-list">
             {fields.map(({ key, label, unit, parse, positive }) => {
               const input = inputs[key] ?? '';
-              const invalid = input.trim() !== '' && values[key] === null;
+              const invalidMultiplier = key === 'saleMultiplier' && multiplierTooHigh;
+              const invalid = invalidMultiplier || (input.trim() !== '' && values[key] === null);
               const messages = {
                 whole: 'Nhập số nguyên từ 0 trở lên.',
                 wholePositive: 'Nhập số nguyên lớn hơn 0.',
@@ -66,7 +102,7 @@ function App() {
                 positive: 'Nhập số lớn hơn 0.',
                 amount: 'Nhập số từ 0 trở lên.',
               };
-              const message = messages[parse === parseWholeNumber ? (positive ? 'wholePositive' : 'whole')
+              const message = invalidMultiplier ? multiplierError : messages[parse === parseWholeNumber ? (positive ? 'wholePositive' : 'whole')
                 : parse === parsePercentage ? 'percent' : positive ? 'positive' : 'amount'];
               return (
                 <div className="field" key={key}>
@@ -76,7 +112,11 @@ function App() {
                       id={key}
                       inputMode={parse === parseWholeNumber ? 'numeric' : 'decimal'}
                       value={input}
-                      onChange={(event) => setInputs({ ...inputs, [key]: event.target.value })}
+                      onChange={(event) => {
+                        const value = parse === parseWholeNumber
+                          ? formatWholeNumberInput(event, input) : event.target.value;
+                        setInputs((current) => ({ ...current, [key]: value }));
+                      }}
                       aria-invalid={invalid}
                       aria-describedby={invalid ? `${key}-error` : undefined}
                       autoComplete="off"
@@ -88,6 +128,13 @@ function App() {
                 </div>
               );
             })}
+          </div>
+          <div className="marketplace">
+            <label className="marketplace-toggle">
+              <input type="checkbox" checked={isShopee} onChange={(event) => setIsShopee(event.target.checked)} />
+              Bán qua Shopee
+            </label>
+            {isShopee && <p>Phí theo phần trăm tính trên giá bán đã làm tròn. Phí hạ tầng tính cho một đơn có một sản phẩm.</p>}
           </div>
         </section>
 
@@ -115,11 +162,14 @@ function App() {
             {result ? (
               <>
                 <p>Trước làm tròn <strong>{money(result.unroundedSalePrice)}</strong></p>
-                <p>Tổng chi phí × {format(values.saleMultiplier)}, làm tròn lên bội số 1.000 ₫.</p>
+                <p>{isShopee
+                  ? `Giữ hệ số × ${format(values.saleMultiplier)} trên tổng chi phí đã gồm phí Shopee.`
+                  : `Tổng chi phí × ${format(values.saleMultiplier)}, làm tròn lên bội số 1.000 ₫.`}</p>
                 <p>Lãi mỗi sản phẩm <strong>{money(result.profit)}</strong></p>
               </>
             ) : <>
-              <p>{valid ? 'Số tiền vượt giới hạn tính toán.' : 'Điền đủ 10 ô để tính giá bán.'}</p>
+              <p>{multiplierTooHigh ? 'Giảm hệ số nhân để tính được giá Shopee.'
+                : valid ? 'Số tiền vượt giới hạn tính toán.' : 'Điền đủ 10 ô để tính giá bán.'}</p>
               <p>Lãi mỗi sản phẩm <strong>—</strong></p>
             </>}
           </div>

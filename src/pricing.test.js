@@ -11,7 +11,7 @@ const example = {
 test('uses all ten inputs and computes profit from the rounded selling price', () => {
   assert.deepEqual(calculatePrice(example), {
     filament: 1200, electricity: 300, machine: 2000, waste: 350, packaging: 0,
-    totalCost: 3850, unroundedSalePrice: 11550, salePrice: 12000, profit: 8150,
+    fees: [], totalCost: 3850, unroundedSalePrice: 11550, salePrice: 12000, profit: 8150,
   });
   assert.deepEqual(calculatePrice({
     grams: 20, filamentPrice: 200000, hours: 2, powerWatts: 150,
@@ -19,11 +19,23 @@ test('uses all ten inputs and computes profit from the rounded selling price', (
     wastePercent: 5, packaging: 500, saleMultiplier: 2.5,
   }), {
     filament: 4000, electricity: 1200, machine: 4000, waste: 460, packaging: 500,
-    totalCost: 10160, unroundedSalePrice: 25400, salePrice: 26000, profit: 15840,
+    fees: [], totalCost: 10160, unroundedSalePrice: 25400, salePrice: 26000, profit: 15840,
   });
   assert.equal(calculatePrice({ ...example, grams: 100, filamentPrice: 100000, hours: 0 }).salePrice, 33000);
   assert.equal(calculatePrice({ ...example, grams: 0, hours: 0 }).salePrice, 0);
   assert.equal(calculatePrice({ ...example, saleMultiplier: 0.5 }).profit, -1850);
+});
+
+test('includes all Shopee charges on the rounded price and keeps the original multiplier', () => {
+  const result = calculatePrice({ ...example, isShopee: true });
+  assert.equal(result.salePrice, 70000);
+  assert.deepEqual(result.fees, [4200, 11200, 3000, 700, 350]);
+  assert.equal(result.totalCost, 23300);
+  assert.equal(result.profit, 46700);
+  assert.ok(result.salePrice >= result.totalCost * example.saleMultiplier);
+  assert.ok(69000 < (3850 + 3000 + 69000 * 0.235) * example.saleMultiplier);
+  assert.equal(calculatePrice({ ...example, saleMultiplier: 5, isShopee: true }), null);
+  assert.equal(calculatePrice({ ...example, saleMultiplier: 5 }).salePrice, 20000);
 });
 
 test('accepts the Excel money and percentage formats and Vietnamese decimals', () => {

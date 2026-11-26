@@ -19,19 +19,40 @@ export function parsePercentage(text) {
 
 export function calculatePrice({
   grams, filamentPrice, hours, powerWatts, electricityPerKwh, printerPrice,
-  printerLifetimeHours, wastePercent, packaging, saleMultiplier,
+  printerLifetimeHours, wastePercent, packaging, saleMultiplier, isShopee = false,
 }) {
   const filament = grams * (filamentPrice / 1000);
   const electricity = hours * (powerWatts / 1000) * electricityPerKwh;
   const machine = hours * (printerPrice / printerLifetimeHours);
   const subtotal = filament + electricity + machine;
   const waste = subtotal * (wastePercent / 100);
-  const totalCost = subtotal + waste + packaging;
-  const unroundedSalePrice = totalCost * saleMultiplier;
+  const baseCost = subtotal + waste + packaging;
+  if (isShopee && exceedsShopeeMultiplierLimit(saleMultiplier)) return null;
+
+  // Solve price = multiplier × (base cost + fixed fees + rate × price).
+  const unroundedSalePrice = isShopee
+    ? ((baseCost + shopeeFixed) * saleMultiplier) / (1 - shopeeRate * saleMultiplier)
+    : baseCost * saleMultiplier;
   // Remove floating-point noise around an exact rounding boundary.
   const salePrice = Math.ceil(Number((unroundedSalePrice / 1000).toPrecision(15))) * 1000;
+  const fees = isShopee ? shopeeFees.map(({ basisPoints, fixed }) => fixed ?? (salePrice * basisPoints) / 10000) : [];
+  const totalCost = baseCost + fees.reduce((total, amount) => total + amount, 0);
 
   if (totalCost > Number.MAX_SAFE_INTEGER || !Number.isSafeInteger(salePrice)) return null;
-  return { filament, electricity, machine, waste, packaging, totalCost, unroundedSalePrice,
+  return { filament, electricity, machine, waste, packaging, fees, totalCost, unroundedSalePrice,
     salePrice, profit: salePrice - totalCost };
 }
+export const shopeeFees = [
+  { label: 'Phí xử lý giao dịch', basisPoints: 600 },
+  { label: 'Phí cố định', basisPoints: 1600 },
+  { label: 'Phí hạ tầng', fixed: 3000 },
+  { label: 'Thuế GTGT', basisPoints: 100 },
+  { label: 'Thuế TNCN', basisPoints: 50 },
+];
+const shopeeRate = shopeeFees.reduce((total, fee) => total + (fee.basisPoints ?? 0), 0) / 10000;
+const shopeeFixed = shopeeFees.reduce((total, fee) => total + (fee.fixed ?? 0), 0);
+
+export function exceedsShopeeMultiplierLimit(multiplier) {
+  return multiplier >= 1 / shopeeRate;
+}
+
