@@ -37,7 +37,7 @@ function placeBlock(spaces, piece, quantity) {
   return block.count;
 }
 
-export function estimateFoamSheets(length, width, pieces) {
+export function estimateSheets(length, width, pieces) {
   if (!Number.isFinite(length) || !Number.isFinite(width) || length <= 0 || width <= 0 || !pieces.length) {
     return { sheets: null };
   }

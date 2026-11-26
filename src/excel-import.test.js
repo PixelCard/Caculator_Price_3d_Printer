@@ -31,7 +31,9 @@ test('imports Foam variable codes, inline laser inputs, margin and the Box table
   sheet.addRow(['L_EVA', 120]);
   sheet.addRow(['W_EVA', '100 cm']);
   sheet.addRow(['N_EVA', 99]);
-  sheet.addRow(['N_giay', 1.5]);
+  sheet.addRow(['L_giay', 120]);
+  sheet.addRow(['W_giay', '100 cm']);
+  sheet.addRow(['N_giay', 99]);
   sheet.addRow(['R_giay', '0,10']);
   sheet.addRow(['* G_laser = 14.000.000 VNĐ (giá thay module Laser 20W).']);
   sheet.addRow(['* H_thu_hoi = 400 giờ (mục tiêu tích lũy đủ tiền thay module).']);
@@ -40,7 +42,8 @@ test('imports Foam variable codes, inline laser inputs, margin and the Box table
   const result = importWorkbook(workbook, [
     { key: 'foamStockLength', label: 'Chiều dài tấm foam gốc', unit: 'cm', positive: true },
     { key: 'foamStockWidth', label: 'Chiều rộng tấm foam gốc', unit: 'cm', positive: true },
-    { key: 'paperSheets', label: 'Số tờ giấy' },
+    { key: 'paperStockLength', label: 'Chiều dài tờ giấy gốc', unit: 'cm', positive: true },
+    { key: 'paperStockWidth', label: 'Chiều rộng tờ giấy gốc', unit: 'cm', positive: true },
     { key: 'paperWaste', label: 'Hao hụt giấy', parse: parsePercentage },
     { key: 'laserReplacement', label: 'Giá thay module laser', unit: 'đ', parse: parseWholeNumber },
     { key: 'laserRecoveryHours', label: 'Số giờ thu hồi chi phí module', unit: 'giờ' },
@@ -50,7 +53,7 @@ test('imports Foam variable codes, inline laser inputs, margin and the Box table
 
   assert.deepEqual(result.inputs, {
     foamStockLength: '120', foamStockWidth: '100',
-    paperSheets: '1,5', paperWaste: '10', laserReplacement: '14.000.000',
+    paperStockLength: '120', paperStockWidth: '100', paperWaste: '10', laserReplacement: '14.000.000',
     laserRecoveryHours: '400', marginPercent: '40', feePercent: '5',
   });
   assert.deepEqual(result.boxes, [{
