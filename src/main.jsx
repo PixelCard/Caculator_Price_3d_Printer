@@ -3,21 +3,21 @@ import { createRoot } from 'react-dom/client';
 import {
   calculatePrice, exceedsShopeeMultiplierLimit, parseAmount, parsePercentage, parseWholeNumber, shopeeFees,
 } from './pricing.js';
+import brandLogo from '../Images/game-piece-labs-logo-horizontal.webp';
 import './styles.css';
 
 const fields = [
-  { key: 'grams', label: 'Khối lượng sản phẩm', unit: 'g', example: '8' },
-  { key: 'filamentPrice', label: 'Giá nhựa', unit: 'đ/kg', example: '150.000', parse: parseWholeNumber },
-  { key: 'hours', label: 'Thời gian in', unit: 'giờ', example: '1' },
-  { key: 'powerWatts', label: 'Công suất máy', unit: 'W', example: '100' },
-  { key: 'electricityPerKwh', label: 'Giá điện', unit: 'đ/kWh', example: '3.000', parse: parseWholeNumber },
-  { key: 'printerPrice', label: 'Giá máy in', unit: 'đ', example: '10.000.000', parse: parseWholeNumber },
-  { key: 'printerLifetimeHours', label: 'Tuổi thọ máy', unit: 'giờ', example: '5.000', parse: parseWholeNumber, positive: true },
-  { key: 'wastePercent', label: 'Tỉ lệ in hỏng', unit: '%', example: '10', parse: parsePercentage },
-  { key: 'packaging', label: 'Bao bì, đóng gói', unit: 'đ', example: '0', parse: parseWholeNumber },
-  { key: 'saleMultiplier', label: 'Hệ số nhân giá bán', unit: 'lần', example: '3', positive: true },
+  { key: 'grams', label: 'Khối lượng sản phẩm', unit: 'g' },
+  { key: 'filamentPrice', label: 'Giá nhựa', unit: 'đ/kg', parse: parseWholeNumber },
+  { key: 'hours', label: 'Thời gian in', unit: 'giờ' },
+  { key: 'powerWatts', label: 'Công suất máy', unit: 'W' },
+  { key: 'electricityPerKwh', label: 'Giá điện', unit: 'đ/kWh', parse: parseWholeNumber },
+  { key: 'printerPrice', label: 'Giá máy in', unit: 'đ', parse: parseWholeNumber },
+  { key: 'printerLifetimeHours', label: 'Tuổi thọ máy', unit: 'giờ', parse: parseWholeNumber, positive: true },
+  { key: 'wastePercent', label: 'Tỉ lệ in hỏng', unit: '%', parse: parsePercentage },
+  { key: 'packaging', label: 'Bao bì, đóng gói', unit: 'đ', parse: parseWholeNumber },
+  { key: 'saleMultiplier', label: 'Hệ số nhân giá bán', unit: 'lần', positive: true },
 ];
-const example = Object.fromEntries(fields.map((field) => [field.key, field.example]));
 const numberFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const format = (amount) => numberFormat.format(amount);
 const money = (amount) => amount == null ? '—' : `${format(amount)} ₫`;
@@ -49,6 +49,27 @@ function formatWholeNumberInput(event, previous) {
   return formatted;
 }
 
+function CostGroup({ id, title, rows, subtotal }) {
+  return (
+    <section className="cost-group" aria-labelledby={id}>
+      <div className="cost-heading">
+        <h3 id={id}>{title}</h3>
+        <strong>{money(subtotal)}</strong>
+      </div>
+      <table aria-labelledby={id}>
+        <tbody>
+          {rows.map(([label, amount, explanation]) => (
+            <tr key={label}>
+              <th scope="row">{label}{explanation && <small>{explanation}</small>}</th>
+              <td>{money(amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 function App() {
   const [inputs, setInputs] = useState({});
   const [isShopee, setIsShopee] = useState(false);
@@ -62,34 +83,29 @@ function App() {
   const multiplierError = 'Hệ số quá cao để tính giá Shopee. Hãy giảm hệ số (ví dụ 4,25 trở xuống).';
   const result = valid && !multiplierTooHigh ? calculatePrice({ ...values, isShopee }) : null;
 
-  const details = [
+  const printCosts = [
     ['Tiền nhựa', result?.filament, 'Khối lượng × giá nhựa ÷ 1.000'],
     ['Tiền điện', result?.electricity, 'Công suất ÷ 1.000 × giờ in × giá điện'],
     ['Hao mòn máy', result?.machine, 'Giá máy ÷ tuổi thọ × giờ in'],
     ['In hỏng', result?.waste, 'Tỉ lệ in hỏng × tổng tiền nhựa, điện và máy'],
-    ['Bao bì', result?.packaging],
-    ...(isShopee ? shopeeFees.map(({ label, basisPoints, fixed }, index) => [
-      label, result?.fees[index], fixed ? `${money(fixed)}/đơn` : `${format(basisPoints / 100)}% giá bán`,
-    ]) : []),
-    ['Tổng chi phí', result?.totalCost],
   ];
+  const marketplaceCosts = shopeeFees.map(({ label, basisPoints, fixed }, index) => [
+    label, result?.fees[index], fixed ? `${money(fixed)}/đơn` : `${format(basisPoints / 100)}% giá bán`,
+  ]);
+  const printSubtotal = result ? printCosts.reduce((total, [, amount]) => total + amount, 0) : null;
+  const marketplaceSubtotal = result?.fees.reduce((total, amount) => total + amount, 0);
 
   return (
     <main className="shell">
       <header className="intro">
-        <div className="title-line">
-          <span>game peice labs</span>
-        </div>
+        <img className="brand-logo" src={brandLogo} alt="Game Piece Labs" width="192" height="72" />
         <h1>Bảng tính giá bán đồ in 3D</h1>
         <p>Điền các ô màu vàng để tự động tính chi phí và giá bán cho một sản phẩm.</p>
       </header>
 
       <div className="workspace">
         <section className="card inputs" aria-labelledby="inputs-title">
-          <div className="section-heading">
-            <h2 id="inputs-title">Thông số nhập</h2>
-            <button type="button" className="example" onClick={() => setInputs(example)}>Điền mẫu Excel</button>
-          </div>
+          <h2 id="inputs-title">Thông số nhập</h2>
           <div className="field-list">
             {fields.map(({ key, label, unit, parse, positive }) => {
               const input = inputs[key] ?? '';
@@ -140,17 +156,16 @@ function App() {
 
         <section className="card breakdown" aria-labelledby="breakdown-title">
           <h2 id="breakdown-title">Chi tiết chi phí</h2>
-          <table>
-            <thead><tr><th scope="col">Khoản chi</th><th scope="col">Số tiền</th></tr></thead>
-            <tbody>
-              {details.map(([label, amount, explanation], index) => (
-                <tr key={label} className={index === details.length - 1 ? 'total' : undefined}>
-                  <th scope="row">{label}{explanation && <small>{explanation}</small>}</th>
-                  <td>{money(amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <CostGroup id="print-costs" title="Chi phí in" rows={printCosts} subtotal={printSubtotal} />
+          <div className="cost-heading packaging-cost">
+            <h3>Bao bì, đóng gói</h3>
+            <strong>{money(result?.packaging)}</strong>
+          </div>
+          {isShopee && <CostGroup id="marketplace-costs" title="Phí Shopee" rows={marketplaceCosts} subtotal={marketplaceSubtotal} />}
+          <div className="cost-heading cost-total">
+            <h3>Tổng chi phí</h3>
+            <strong>{money(result?.totalCost)}</strong>
+          </div>
         </section>
 
         <section className="sale" aria-labelledby="sale-title">
