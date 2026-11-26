@@ -224,6 +224,7 @@ export default function FoamCalculator() {
   const invalidGroup = inputGroups.find(([, sections]) => sections.some(([, groupFields]) =>
     groupFields.some((field) => isActiveField(field) && (values[field.key] === null || issues[field.key]))));
   const result = invalidGroup ? null : calculateFoamPrice(values, isShopee);
+  const priceWithoutShopee = result && isShopee ? calculateFoamPrice(values)?.salePrice : null;
   const laserHourly = values.laserReplacement !== null && values.laserRecoveryHours > 0
     ? values.laserReplacement / values.laserRecoveryHours : null;
 
@@ -293,6 +294,8 @@ export default function FoamCalculator() {
             <p>{isShopee ? 'Phí Shopee' : 'Phí bán hàng'} <strong>{money(result.salesFee)}</strong></p>
             <p>Lãi sau phí <strong>{money(result.profit)}</strong></p>
             <p>Tỉ lệ lãi thực tế <strong>{result.actualMargin === null ? '—' : `${format(result.actualMargin)}%`}</strong></p>
+            {isShopee && <p className="sale-comparison">Giá bán không qua Shopee <strong>{money(priceWithoutShopee)}</strong></p>}
+            {isShopee && priceWithoutShopee == null && <p>Bỏ tick Shopee để kiểm tra tỉ lệ phí bán hàng.</p>}
           </> : <p>{invalidGroup ? `Kiểm tra các ô trong nhóm ${invalidGroup[0]}.` : 'Số tiền vượt giới hạn tính toán.'}</p>}
         </div>
       </section>
