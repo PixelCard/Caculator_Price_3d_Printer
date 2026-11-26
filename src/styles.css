@@ -126,6 +126,9 @@ h2 { font-size: 1.25rem; line-height: 1.3; letter-spacing: -0.018em; }
 .foam-box-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .foam-button, .foam-remove { padding: 7px 11px; border: 0; border-radius: 8px; font-size: 0.88rem; font-weight: 650; cursor: pointer; }
 .foam-button { background: #eeebfb; color: #4d3b9e; }
+.excel-import { display: flex; flex-wrap: wrap; gap: 5px 10px; align-items: center; margin-top: 12px; }
+.excel-import .foam-note, .excel-import .error { margin: 0; }
+.excel-import button:disabled { opacity: 0.6; cursor: wait; }
 .foam-remove { background: #fbeced; color: #8b2d36; }
 .foam-box-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .foam-box-list:not(:empty) { margin-top: 14px; }

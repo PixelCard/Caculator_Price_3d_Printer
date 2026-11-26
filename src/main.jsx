@@ -6,6 +6,7 @@ import {
 import brandLogo from '../Images/game-piece-labs-logo-horizontal.webp';
 import { CostGroup, NumberField, ShopeeCostGroup, format, money } from './calculator-ui.jsx';
 import FoamCalculator from './FoamCalculator.jsx';
+import ExcelImport from './ExcelImport.jsx';
 import './styles.css';
 
 const fields = [
@@ -45,6 +46,8 @@ function PrintCalculator() {
       <div className="workspace">
         <section className="card inputs" aria-labelledby="inputs-title">
           <h2 id="inputs-title">Thông số nhập</h2>
+          <ExcelImport mode="print" fields={fields}
+            onImport={({ inputs: imported }) => setInputs((current) => ({ ...current, ...imported }))} />
           <div className="field-list">
             {fields.map((field) => (
               <NumberField

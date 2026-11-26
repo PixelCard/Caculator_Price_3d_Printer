@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { CostGroup, NumberField, ShopeeCostGroup, format, money } from './calculator-ui.jsx';
 import { calculateFoamPrice, foamInputIssues } from './foam-pricing.js';
 import { parseAmount, parsePercentage, parseWholeNumber } from './pricing.js';
+import ExcelImport from './ExcelImport.jsx';
 
 const number = (key, label, unit) => ({ key, label, unit });
 const whole = (key, label, unit) => ({ key, label, unit, parse: parseWholeNumber });
@@ -166,9 +167,7 @@ const costGroups = [
   ['other', 'Chi phí phụ', ['Đóng gói', 'Vật tư foil', 'Phát sinh', 'Chi phí chung']],
 ];
 
-function BoxList() {
-  const [boxes, setBoxes] = useState(defaultBoxes);
-  const nextId = useRef(defaultBoxes.length + 1);
+function BoxList({ boxes, setBoxes, nextId, children }) {
   const updateBox = (id, key, value) => {
     setBoxes((current) => current.map((box) => box.id === id ? { ...box, [key]: value } : box));
   };
@@ -183,6 +182,7 @@ function BoxList() {
         <h2 id="box-title">Danh sách Box</h2>
         <button type="button" className="foam-button" onClick={addBox}>Thêm Box</button>
       </div>
+      {children}
       <p className="foam-note">Nhập số tấm foam và số tờ giấy dùng cho cả bộ trong nhóm EVA Foam và giấy.</p>
       <div className="foam-box-list">
         {boxes.map((box) => (
@@ -217,6 +217,8 @@ function BoxList() {
 
 export default function FoamCalculator() {
   const [inputs, setInputs] = useState(defaultInputs);
+  const [boxes, setBoxes] = useState(defaultBoxes);
+  const nextBoxId = useRef(defaultBoxes.length + 1);
   const [isShopee, setIsShopee] = useState(false);
   const values = Object.fromEntries(fields.map(({ key, parse = parseAmount }) => [key, parse(inputs[key] ?? '')]));
   const issues = foamInputIssues(values, isShopee);
@@ -227,10 +229,19 @@ export default function FoamCalculator() {
   const priceWithoutShopee = isShopee && result ? calculateFoamPrice(values)?.salePrice : result?.salePrice;
   const laserHourly = values.laserReplacement !== null && values.laserRecoveryHours > 0
     ? values.laserReplacement / values.laserRecoveryHours : null;
+  function applyImport({ inputs: imported, boxes: importedBoxes }) {
+    setInputs((current) => ({ ...current, ...imported }));
+    if (importedBoxes.length) {
+      setBoxes(importedBoxes.map((box, index) => ({ ...box, id: index + 1 })));
+      nextBoxId.current = importedBoxes.length + 1;
+    }
+  }
 
   return (
     <div className="workspace foam-workspace">
-      <BoxList />
+      <BoxList boxes={boxes} setBoxes={setBoxes} nextId={nextBoxId}>
+        <ExcelImport mode="foam" fields={fields} onImport={applyImport} />
+      </BoxList>
 
       <section className="card inputs" aria-labelledby="foam-inputs-title">
         <h2 id="foam-inputs-title">Thông số nhập</h2>
