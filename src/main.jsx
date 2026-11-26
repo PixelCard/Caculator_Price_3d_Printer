@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   calculatePrice, exceedsShopeeMultiplierLimit, parseAmount, parsePercentage, parseWholeNumber, shopeeFees,
 } from './pricing.js';
 import brandLogo from '../Images/game-piece-labs-logo-horizontal.webp';
+import { CostGroup, NumberField, format, money } from './calculator-ui.jsx';
+import FoamCalculator from './FoamCalculator.jsx';
 import './styles.css';
 
 const fields = [
@@ -18,59 +20,7 @@ const fields = [
   { key: 'packaging', label: 'Bao bì, đóng gói', unit: 'đ', parse: parseWholeNumber },
   { key: 'saleMultiplier', label: 'Hệ số nhân giá bán', unit: 'lần', positive: true },
 ];
-const numberFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
-const format = (amount) => numberFormat.format(amount);
-const money = (amount) => amount == null ? '—' : `${format(amount)} ₫`;
-
-function formatWholeNumberInput(event, previous) {
-  const input = event.target;
-  const raw = input.value;
-  const { inputType, data } = event.nativeEvent;
-  const editsDigits = inputType?.startsWith('delete') || (inputType === 'insertText' && /^\d+$/.test(data ?? ''));
-  // A keystroke can temporarily leave the separators from the previous value in place.
-  const candidate = editsDigits && parseWholeNumber(previous) !== null && /^[\d.]+$/.test(raw)
-    ? raw.replaceAll('.', '') : raw;
-  const number = parseWholeNumber(candidate);
-  if (number === null) return raw;
-
-  const formatted = format(number);
-  if (formatted !== raw) {
-    const digitsAfterCaret = raw.slice(input.selectionStart).replace(/\D/g, '').length;
-    let caret = formatted.length;
-    let remaining = digitsAfterCaret;
-    while (caret > 0 && remaining > 0) {
-      caret -= 1;
-      if (/\d/.test(formatted[caret])) remaining -= 1;
-    }
-    requestAnimationFrame(() => {
-      if (input.value === formatted && document.activeElement === input) input.setSelectionRange(caret, caret);
-    });
-  }
-  return formatted;
-}
-
-function CostGroup({ id, title, rows, subtotal }) {
-  return (
-    <section className="cost-group" aria-labelledby={id}>
-      <div className="cost-heading">
-        <h3 id={id}>{title}</h3>
-        <strong>{money(subtotal)}</strong>
-      </div>
-      <table aria-labelledby={id}>
-        <tbody>
-          {rows.map(([label, amount, explanation]) => (
-            <tr key={label}>
-              <th scope="row">{label}{explanation && <small>{explanation}</small>}</th>
-              <td>{money(amount)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
-function App() {
+function PrintCalculator() {
   const [inputs, setInputs] = useState({});
   const [isShopee, setIsShopee] = useState(false);
   const values = Object.fromEntries(fields.map(({ key, parse = parseAmount, positive }) => {
@@ -96,54 +46,21 @@ function App() {
   const marketplaceSubtotal = result?.fees.reduce((total, amount) => total + amount, 0);
 
   return (
-    <main className="shell">
-      <header className="intro">
-        <img className="brand-logo" src={brandLogo} alt="Game Piece Labs" width="256" height="98" />
-        <h1>Bảng tính giá bán đồ in 3D</h1>
-        <p>Điền các ô màu vàng để tự động tính chi phí và giá bán cho một sản phẩm.</p>
-      </header>
-
       <div className="workspace">
         <section className="card inputs" aria-labelledby="inputs-title">
           <h2 id="inputs-title">Thông số nhập</h2>
           <div className="field-list">
-            {fields.map(({ key, label, unit, parse, positive }) => {
-              const input = inputs[key] ?? '';
-              const invalidMultiplier = key === 'saleMultiplier' && multiplierTooHigh;
-              const invalid = invalidMultiplier || (input.trim() !== '' && values[key] === null);
-              const messages = {
-                whole: 'Nhập số nguyên từ 0 trở lên.',
-                wholePositive: 'Nhập số nguyên lớn hơn 0.',
-                percent: 'Nhập tỉ lệ từ 0 đến 100%.',
-                positive: 'Nhập số lớn hơn 0.',
-                amount: 'Nhập số từ 0 trở lên.',
-              };
-              const message = invalidMultiplier ? multiplierError : messages[parse === parseWholeNumber ? (positive ? 'wholePositive' : 'whole')
-                : parse === parsePercentage ? 'percent' : positive ? 'positive' : 'amount'];
-              return (
-                <div className="field" key={key}>
-                  <label htmlFor={key}>{label}</label>
-                  <div className="input-box">
-                    <input
-                      id={key}
-                      inputMode={parse === parseWholeNumber ? 'numeric' : 'decimal'}
-                      value={input}
-                      onChange={(event) => {
-                        const value = parse === parseWholeNumber
-                          ? formatWholeNumberInput(event, input) : event.target.value;
-                        setInputs((current) => ({ ...current, [key]: value }));
-                      }}
-                      aria-invalid={invalid}
-                      aria-describedby={invalid ? `${key}-error` : undefined}
-                      autoComplete="off"
-                      required
-                    />
-                    <span className="unit">{unit}</span>
-                  </div>
-                  {invalid && <p id={`${key}-error`} className="error">{message}</p>}
-                </div>
-              );
-            })}
+            {fields.map((field) => (
+              <NumberField
+                key={field.key}
+                id={field.key}
+                field={field}
+                input={inputs[field.key] ?? ''}
+                value={values[field.key]}
+                error={field.key === 'saleMultiplier' && multiplierTooHigh ? multiplierError : undefined}
+                onChange={(value) => setInputs((current) => ({ ...current, [field.key]: value }))}
+              />
+            ))}
           </div>
           <div className="marketplace">
             <label className="marketplace-toggle">
@@ -190,6 +107,43 @@ function App() {
           </div>
         </section>
       </div>
+  );
+}
+
+const pages = {
+  '#in-3d': { label: 'Tính giá in 3D', title: 'Bảng tính giá bán đồ in 3D', unit: 'một sản phẩm' },
+  '#foam-giay': { label: 'Tính giá Foam & Giấy', title: 'Bảng tính giá bán Foam & Giấy', unit: 'một bộ sản phẩm' },
+};
+const currentPage = () => window.location.hash === '#foam-giay' ? '#foam-giay' : '#in-3d';
+
+function App() {
+  const [page, setPage] = useState(currentPage);
+  useEffect(() => {
+    const updatePage = () => setPage(currentPage());
+    window.addEventListener('hashchange', updatePage);
+    return () => window.removeEventListener('hashchange', updatePage);
+  }, []);
+  const { title, unit } = pages[page];
+  useEffect(() => {
+    document.title = `${title} – Game Piece Labs`;
+  }, [title]);
+
+  return (
+    <main className="shell">
+      <header className="intro">
+        <div className="brand-bar">
+          <img className="brand-logo" src={brandLogo} alt="Game Piece Labs" width="256" height="98" />
+          <nav className="calculator-nav" aria-label="Chọn bảng tính">
+            {Object.entries(pages).map(([route, { label }]) => (
+              <a key={route} href={route} aria-current={route === page ? 'page' : undefined}>{label}</a>
+            ))}
+          </nav>
+        </div>
+        <h1>{title}</h1>
+        <p>Điền các ô màu vàng để tự động tính chi phí và giá bán cho {unit}.</p>
+      </header>
+      <div hidden={page !== '#in-3d'}><PrintCalculator /></div>
+      <div hidden={page !== '#foam-giay'}><FoamCalculator /></div>
     </main>
   );
 }
