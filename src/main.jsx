@@ -1,33 +1,41 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { assumptions, calculatePrice, parseAmount, parseFilamentPrice } from './pricing.js';
+import { calculatePrice, parseAmount, parsePercentage, parseWholeNumber } from './pricing.js';
 import './styles.css';
 
 const fields = [
-  { key: 'grams', label: 'Lượng nhựa tiêu hao', unit: 'g' },
-  { key: 'filamentPrice', label: 'Giá nhựa', unit: 'đ/kg', hint: 'Ví dụ 150.000 đ/kg', parse: parseFilamentPrice },
-  { key: 'hours', label: 'Thời gian in', unit: 'giờ', hint: '30 phút = 0,5 giờ' },
+  { key: 'grams', label: 'Khối lượng sản phẩm', unit: 'g', example: '8' },
+  { key: 'filamentPrice', label: 'Giá nhựa', unit: 'đ/kg', example: '150.000', parse: parseWholeNumber },
+  { key: 'hours', label: 'Thời gian in', unit: 'giờ', example: '1' },
+  { key: 'powerWatts', label: 'Công suất máy', unit: 'W', example: '100' },
+  { key: 'electricityPerKwh', label: 'Giá điện', unit: 'đ/kWh', example: '3.000', parse: parseWholeNumber },
+  { key: 'printerPrice', label: 'Giá máy in', unit: 'đ', example: '10.000.000', parse: parseWholeNumber },
+  { key: 'printerLifetimeHours', label: 'Tuổi thọ máy', unit: 'giờ', example: '5.000', parse: parseWholeNumber, positive: true },
+  { key: 'wastePercent', label: 'Tỉ lệ in hỏng', unit: '%', example: '10', parse: parsePercentage },
+  { key: 'packaging', label: 'Bao bì, đóng gói', unit: 'đ', example: '0', parse: parseWholeNumber },
+  { key: 'saleMultiplier', label: 'Hệ số nhân giá bán', unit: 'lần', example: '3', positive: true },
 ];
-const example = { grams: '8', filamentPrice: '150.000', hours: '1' };
+const example = Object.fromEntries(fields.map((field) => [field.key, field.example]));
 const numberFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const format = (amount) => numberFormat.format(amount);
 const money = (amount) => amount == null ? '—' : `${format(amount)} ₫`;
 
 function App() {
-  const [inputs, setInputs] = useState(example);
-  const grams = parseAmount(inputs.grams);
-  const filamentPrice = parseFilamentPrice(inputs.filamentPrice);
-  const hours = parseAmount(inputs.hours);
-  const valid = grams != null && filamentPrice != null && hours != null;
-  const result = valid ? calculatePrice(grams, filamentPrice, hours) : null;
+  const [inputs, setInputs] = useState({});
+  const values = Object.fromEntries(fields.map(({ key, parse = parseAmount, positive }) => {
+    const value = parse(inputs[key] ?? '');
+    return [key, positive && value === 0 ? null : value];
+  }));
+  const valid = Object.values(values).every((value) => value !== null);
+  const result = valid ? calculatePrice(values) : null;
 
   const details = [
-    ['Tiền nhựa', result?.filament, valid ? `${format(grams)} g × ${format(filamentPrice / 1000)} đ/g` : 'Lượng nhựa × đơn giá theo gram'],
-    ['Tiền điện', result?.electricity, '300 đ/giờ × thời gian in'],
-    ['Tiền máy', result?.machine, '2.000 đ/giờ × thời gian in'],
-    ['Chi phí một lượt in', result?.subtotal],
-    ['Dự phòng in hỏng', result?.waste, '10% chi phí một lượt in'],
-    ['Tổng chi phí in ước tính', result?.printingCost],
+    ['Tiền nhựa', result?.filament, 'Khối lượng × giá nhựa ÷ 1.000'],
+    ['Tiền điện', result?.electricity, 'Công suất ÷ 1.000 × giờ in × giá điện'],
+    ['Hao mòn máy', result?.machine, 'Giá máy ÷ tuổi thọ × giờ in'],
+    ['In hỏng', result?.waste, 'Tỉ lệ in hỏng × tổng tiền nhựa, điện và máy'],
+    ['Bao bì', result?.packaging],
+    ['Tổng chi phí', result?.totalCost],
   ];
 
   return (
@@ -35,55 +43,52 @@ function App() {
       <header className="intro">
         <div className="title-line">
           <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
-          <span>Tính giá in 3D</span>
+          <span>BrosFil</span>
         </div>
-        <h1>Chi phí in và giá bán</h1>
-        <p>Nhập ba thông số để xem từng khoản chi phí và giá bán gợi ý cho một sản phẩm.</p>
+        <h1>Bảng tính giá bán đồ in 3D</h1>
+        <p>Điền các ô màu vàng để tự động tính chi phí và giá bán cho một sản phẩm.</p>
       </header>
 
       <div className="workspace">
         <section className="card inputs" aria-labelledby="inputs-title">
           <div className="section-heading">
-            <h2 id="inputs-title">Thông số in</h2>
-            <button type="button" className="example" onClick={() => setInputs(example)}>Điền ví dụ</button>
+            <h2 id="inputs-title">Thông số nhập</h2>
+            <button type="button" className="example" onClick={() => setInputs(example)}>Điền mẫu Excel</button>
           </div>
           <div className="field-list">
-            {fields.map(({ key, label, unit, hint, parse = parseAmount }) => {
-              const invalid = inputs[key].trim() !== '' && parse(inputs[key]) === null;
-              const invalidMessage = key === 'filamentPrice'
-                ? 'Nhập số nguyên từ 0 trở lên, ví dụ 150.000.'
-                : 'Nhập số từ 0 trở lên, ví dụ 0,5.';
-              const message = invalid ? invalidMessage : hint;
+            {fields.map(({ key, label, unit, parse, positive }) => {
+              const input = inputs[key] ?? '';
+              const invalid = input.trim() !== '' && values[key] === null;
+              const messages = {
+                whole: 'Nhập số nguyên từ 0 trở lên.',
+                wholePositive: 'Nhập số nguyên lớn hơn 0.',
+                percent: 'Nhập tỉ lệ từ 0 đến 100%.',
+                positive: 'Nhập số lớn hơn 0.',
+                amount: 'Nhập số từ 0 trở lên.',
+              };
+              const message = messages[parse === parseWholeNumber ? (positive ? 'wholePositive' : 'whole')
+                : parse === parsePercentage ? 'percent' : positive ? 'positive' : 'amount'];
               return (
                 <div className="field" key={key}>
                   <label htmlFor={key}>{label}</label>
                   <div className="input-box">
                     <input
                       id={key}
-                      inputMode="decimal"
-                      value={inputs[key]}
+                      inputMode={parse === parseWholeNumber ? 'numeric' : 'decimal'}
+                      value={input}
                       onChange={(event) => setInputs({ ...inputs, [key]: event.target.value })}
                       aria-invalid={invalid}
-                      aria-describedby={message ? `${key}-hint` : undefined}
+                      aria-describedby={invalid ? `${key}-error` : undefined}
                       autoComplete="off"
+                      required
                     />
                     <span className="unit">{unit}</span>
                   </div>
-                  {message && <p id={`${key}-hint`} className={invalid ? 'error' : 'hint'}>{message}</p>}
+                  {invalid && <p id={`${key}-error`} className="error">{message}</p>}
                 </div>
               );
             })}
           </div>
-          <details className="assumptions">
-            <summary>Thông số mặc định</summary>
-            <dl>
-              <div><dt>Điện · 100 W × 3.000 đ/kWh</dt><dd>300 đ/giờ</dd></div>
-              <div><dt>Máy · 10 triệu ÷ 5.000 giờ</dt><dd>2.000 đ/giờ</dd></div>
-              <div><dt>Dự phòng in hỏng</dt><dd>10%</dd></div>
-              <div><dt>Hệ số giá bán</dt><dd>× {assumptions.saleMultiplier}</dd></div>
-            </dl>
-            <p className="hint">Hệ số 3 lấy từ công thức giá bán trong bài mẫu.</p>
-          </details>
         </section>
 
         <section className="card breakdown" aria-labelledby="breakdown-title">
@@ -92,7 +97,7 @@ function App() {
             <thead><tr><th scope="col">Khoản chi</th><th scope="col">Số tiền</th></tr></thead>
             <tbody>
               {details.map(([label, amount, explanation], index) => (
-                <tr key={label} className={index === 3 ? 'subtotal' : index === 5 ? 'total' : undefined}>
+                <tr key={label} className={index === details.length - 1 ? 'total' : undefined}>
                   <th scope="row">{label}{explanation && <small>{explanation}</small>}</th>
                   <td>{money(amount)}</td>
                 </tr>
@@ -110,9 +115,13 @@ function App() {
             {result ? (
               <>
                 <p>Trước làm tròn <strong>{money(result.unroundedSalePrice)}</strong></p>
-                <p>Chi phí in × 3, làm tròn lên bội số 1.000 ₫.</p>
+                <p>Tổng chi phí × {format(values.saleMultiplier)}, làm tròn lên bội số 1.000 ₫.</p>
+                <p>Lãi mỗi sản phẩm <strong>{money(result.profit)}</strong></p>
               </>
-            ) : <p>{valid ? 'Số tiền vượt giới hạn tính toán.' : 'Điền đủ ba ô bằng số hợp lệ để tính giá.'}</p>}
+            ) : <>
+              <p>{valid ? 'Số tiền vượt giới hạn tính toán.' : 'Điền đủ 10 ô để tính giá bán.'}</p>
+              <p>Lãi mỗi sản phẩm <strong>—</strong></p>
+            </>}
           </div>
         </section>
       </div>
