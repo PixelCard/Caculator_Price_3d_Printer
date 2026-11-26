@@ -3,7 +3,7 @@ import { parsePercentage, parseWholeNumber, shopeeFees } from './pricing.js';
 
 const numberFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 export const format = (amount) => numberFormat.format(amount);
-export const money = (amount) => amount == null ? '—' : `${format(amount)} ₫`;
+export const money = (amount) => amount == null ? '—' : `${format(Math.trunc(amount) || 0)} ₫`;
 
 function formatWholeNumberInput(event, previous) {
   const input = event.target;
